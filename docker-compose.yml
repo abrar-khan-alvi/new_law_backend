@@ -1,0 +1,51 @@
+services:
+
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: law_enforcement_db
+      POSTGRES_USER: le_user
+      POSTGRES_PASSWORD: devpassword123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U le_user -d law_enforcement_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: .
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: core.settings.development
+      # Override .env so the container talks to the compose services:
+      USE_SQLITE: "False"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: law_enforcement_db
+      DB_USER: le_user
+      DB_PASSWORD: devpassword123
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+volumes:
+  postgres_data:

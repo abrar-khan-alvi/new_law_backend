@@ -1,0 +1,74 @@
+# ════════════════════════════════════════
+# ACTIVE — Phase 1 & 2 (kept light for fast Docker builds)
+# Uncomment later blocks as we reach each phase.
+# ════════════════════════════════════════
+
+# CORE DJANGO
+Django==5.0.6
+djangorestframework==3.15.2
+django-cors-headers==4.4.0
+django-environ==0.11.2
+django-filter==24.3
+djangorestframework-simplejwt==5.3.1
+
+# DATABASE
+psycopg2-binary==2.9.9           # PostgreSQL adapter
+pgvector==0.3.2                  # Vector embeddings in PostgreSQL
+redis==5.0.7                     # Redis client
+
+# AUTHENTICATION (Phase 2) — self-hosted JWT (no Firebase)
+PyJWT==2.9.0                     # dependency of simplejwt
+cryptography==43.0.0
+django-axes==6.5.0               # brute-force login protection
+
+# UTILITIES (lightweight, used early)
+python-dateutil==2.9.0
+pytz==2024.1
+shortuuid==1.0.13                # Short unique IDs for case numbers
+python-slugify==8.0.4
+drf-spectacular==0.27.2          # OpenAPI/Swagger docs
+django-ratelimit==4.1.0
+
+# PRODUCTION SERVER
+gunicorn==22.0.0
+whitenoise==6.7.0
+
+# ════════════════════════════════════════
+# PHASE 3 — AWS, AI inference, exporters, doc parsing
+# (heavier; uncomment at Phase 3)
+# ════════════════════════════════════════
+boto3==1.35.0                    # AWS SDK (Bedrock, S3)
+botocore==1.35.0
+requests==2.32.3                 # Ollama HTTP calls
+# django-storages==1.14.4
+# watchtower==3.3.1
+# langchain==0.2.14
+# langchain-community==0.2.12
+# langchain-aws==0.1.18
+# sentence-transformers==3.1.0   # pulls torch — large
+# numpy==1.26.4
+# PyMuPDF==1.24.9
+# python-docx==1.1.2
+# pdfplumber==0.11.3
+# mammoth==1.8.0
+# reportlab==4.2.2
+# WeasyPrint==62.3               # needs system libs (cairo/pango)
+# Pillow==10.4.0
+
+# ════════════════════════════════════════
+# PHASE 4 — blog media + payments
+# ════════════════════════════════════════
+# python-magic==0.4.27          # needs libmagic system lib
+# moviepy==1.0.3
+# ffmpeg-python==0.2.0          # needs ffmpeg
+# stripe==10.7.0
+# bleach==6.1.0
+# Markdown==3.6
+
+# ════════════════════════════════════════
+# PHASE 5 — async tasks
+# ════════════════════════════════════════
+# celery==5.4.0
+# django-celery-beat==2.7.0
+# django-celery-results==2.5.1
+# flower==2.0.1
