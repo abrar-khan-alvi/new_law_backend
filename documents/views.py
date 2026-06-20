@@ -1,6 +1,7 @@
 import time
 
 import shortuuid
+from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -12,16 +13,22 @@ from ai_engine.prompt_builder import PROMPT_BUILDERS
 from subscriptions.models import UsageLog
 from utils.audit_log import (
     log_document_access,
+    log_document_export,
     log_document_generation,
 )
 from utils.exceptions import QuotaExceeded
 from utils.pagination import StandardPagination
 
+from .exporters import render_docx, render_pdf
 from .models import GeneratedDocument
 from .serializers import (
     GeneratedDocumentListSerializer,
     GeneratedDocumentSerializer,
     GenerateRequestSerializer,
+)
+
+_DOCX_CONTENT_TYPE = (
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 )
 
 
@@ -184,3 +191,53 @@ class DocumentDetailView(APIView):
         self.check_object_permissions(request, doc)
         log_document_access(request.user, str(doc.id))
         return Response(GeneratedDocumentSerializer(doc).data)
+
+
+class ExportDocumentView(APIView):
+    """
+    POST /api/documents/<pk>/export/
+    Body: {"format": "pdf"|"docx", "edited_text": "<optional officer-edited narrative>"}
+    """
+    permission_classes = [IsOfficer]
+
+    def post(self, request, pk):
+        try:
+            doc = GeneratedDocument.objects.get(pk=pk, user=request.user)
+        except GeneratedDocument.DoesNotExist:
+            return Response({'error': {'detail': 'Document not found.'}}, status=404)
+
+        export_format = (request.data.get('format') or 'pdf').lower()
+        if export_format not in ('pdf', 'docx'):
+            return Response(
+                {'error': {'detail': 'Invalid format. Use pdf or docx.'}}, status=400)
+
+        # Plan-based export gating (admins bypass).
+        user = request.user
+        if user.role != 'admin':
+            plan = getattr(getattr(user, 'subscription', None), 'plan', None)
+            allowed = plan and (
+                plan.can_export_pdf if export_format == 'pdf' else plan.can_export_docx
+            )
+            if not allowed:
+                return Response(
+                    {'error': {'detail': f'Your plan does not allow {export_format} export.',
+                               'code': 'export_not_in_plan'}},
+                    status=403,
+                )
+
+        narrative = request.data.get('edited_text') or doc.ai_narrative
+        officer = _officer_profile(user)
+        filename = f"{doc.doc_type}_{doc.case_number or doc.id}".replace(' ', '_')
+
+        log_document_export(user, str(doc.id), export_format)
+
+        if export_format == 'pdf':
+            content = render_pdf(doc.doc_type, doc.form_data, narrative, officer)
+            response = HttpResponse(content, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{filename}.pdf"'
+            return response
+
+        buf = render_docx(doc.doc_type, doc.form_data, narrative, officer)
+        response = HttpResponse(buf.getvalue(), content_type=_DOCX_CONTENT_TYPE)
+        response['Content-Disposition'] = f'attachment; filename="{filename}.docx"'
+        return response

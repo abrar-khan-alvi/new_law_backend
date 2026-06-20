@@ -49,8 +49,9 @@ LOCAL_APPS = [
     'subscriptions',
     'ai_engine',
     'documents',
-    # Added per-phase:
-    # 'blog', 'payments', 'admin_panel',
+    'blog',
+    'payments',
+    'admin_panel',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -205,6 +206,22 @@ AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
 AWS_REGION = env('AWS_REGION', default='us-east-1')
 AWS_S3_BUCKET = env('AWS_S3_BUCKET', default='')
 AWS_S3_BUCKET_REGION = env('AWS_S3_BUCKET_REGION', default=AWS_REGION)
+
+# ── Stripe (payments) ────────────────────────────────────────────────
+# Code is present but DORMANT until a secret key is configured.
+STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
+STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='')
+STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET', default='')
+STRIPE_PRICES = {
+    ('basic', 'monthly'): env('STRIPE_PRICE_BASIC_MONTHLY', default=''),
+    ('basic', 'yearly'): env('STRIPE_PRICE_BASIC_YEARLY', default=''),
+    ('pro', 'monthly'): env('STRIPE_PRICE_PRO_MONTHLY', default=''),
+    ('pro', 'yearly'): env('STRIPE_PRICE_PRO_YEARLY', default=''),
+    ('enterprise', 'monthly'): env('STRIPE_PRICE_ENTERPRISE_MONTHLY', default=''),
+    ('enterprise', 'yearly'): env('STRIPE_PRICE_ENTERPRISE_YEARLY', default=''),
+}
+# Live checkout/webhook only run when a key is present.
+PAYMENTS_ENABLED = bool(STRIPE_SECRET_KEY)
 
 # ── Logging (incl. audit) ────────────────────────────────────────────
 LOGGING = {

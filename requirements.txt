@@ -48,22 +48,22 @@ requests==2.32.3                 # Ollama HTTP calls
 # sentence-transformers==3.1.0   # pulls torch — large
 # numpy==1.26.4
 # PyMuPDF==1.24.9
-# python-docx==1.1.2
+python-docx==1.1.2               # DOCX export
 # pdfplumber==0.11.3
 # mammoth==1.8.0
-# reportlab==4.2.2
+reportlab==4.2.2                 # PDF export
 # WeasyPrint==62.3               # needs system libs (cairo/pango)
-# Pillow==10.4.0
+Pillow==10.4.0                   # image support for PDF
 
 # ════════════════════════════════════════
 # PHASE 4 — blog media + payments
 # ════════════════════════════════════════
-# python-magic==0.4.27          # needs libmagic system lib
+# python-magic==0.4.27          # needs libmagic system lib (using stdlib mimetypes instead)
 # moviepy==1.0.3
-# ffmpeg-python==0.2.0          # needs ffmpeg
-# stripe==10.7.0
-# bleach==6.1.0
-# Markdown==3.6
+# ffmpeg-python==0.2.0          # needs ffmpeg (video thumbnails deferred)
+stripe==10.7.0                   # payments (code present; activated later via keys)
+bleach==6.1.0                    # sanitize blog HTML
+Markdown==3.6                    # render blog markdown
 
 # ════════════════════════════════════════
 # PHASE 5 — async tasks
