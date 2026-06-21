@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from accounts.permissions import IsOfficer, IsOwnerOrAdmin
 from ai_engine.leak_check import check_narrative
 from ai_engine.model_client import ModelClient
+from ai_engine.postprocess import clean_narrative
 from ai_engine.prompt_builder import PROMPT_BUILDERS
 from subscriptions.models import UsageLog
 from utils.audit_log import (
@@ -59,6 +60,9 @@ def _run_generation(doc, narrative_style, temperature=0.2):
     ai_text = client.generate(prompt, max_tokens=3000, temperature=temperature)
     elapsed = int((time.time() - start) * 1000)
 
+    # Strip Markdown / echoed signature blocks the model may add (model-independent).
+    ai_text = clean_narrative(ai_text, officer)
+
     # Deterministic post-generation leak/hallucination check (flags, never edits).
     doc.leak_flags = check_narrative(ai_text, doc.form_data, officer)
 
@@ -102,6 +106,8 @@ class GenerateDocumentView(APIView):
                 raise QuotaExceeded()
 
         case_number = form_data.get('case_number') or f"LE-{shortuuid.uuid()[:10].upper()}"
+        # Persist the resolved case number into form_data so exporters render it.
+        form_data['case_number'] = case_number
 
         doc = GeneratedDocument.objects.create(
             user=user,

@@ -58,6 +58,14 @@ _ANTI_LEAK = (
     "time, or event from the samples unless it also appears in the FACTS block.\n"
 )
 
+_OUTPUT_RULES = (
+    "OUTPUT FORMAT: Write plain narrative prose only. Do NOT use Markdown, "
+    "asterisks, bold, bullet points, or headings/labels such as 'Narrative:', "
+    "'NARRATIVE', or 'End of Narrative'. Do NOT restate or append the officer's "
+    "name, badge, rank, ORI, department, or any signature block — the document "
+    "template adds those automatically.\n\n"
+)
+
 
 def _sanitize_examples(text: str) -> str:
     for pattern, repl in _REDACTIONS:
@@ -128,7 +136,9 @@ def build_incident_report_prompt(form_data, officer, narrative_style='first_pers
         "You are assisting a law enforcement officer in drafting the NARRATIVE "
         "section of an incident report. Be objective, chronological, and "
         "professional. Use 24-hour time.\n\n"
+        f"{_OUTPUT_RULES}"
         f"{_style_instruction(narrative_style)}\n\n"
+        "Officer on the report (context only — do NOT reproduce as a signature):\n"
         f"{_officer_block(officer)}\n"
         "Incident context (for accuracy):\n"
         f"- Categories: {categories or 'N/A'}\n"
@@ -171,7 +181,9 @@ def build_search_warrant_prompt(form_data, officer, narrative_style='first_perso
         "(statement of probable cause) for a search warrant. Be precise and "
         "factual, and establish a clear nexus between the offenses and the place "
         "to be searched.\n\n"
+        f"{_OUTPUT_RULES}"
         f"{_style_instruction(narrative_style)}\n\n"
+        "Affiant officer (context only — do NOT reproduce as a signature):\n"
         f"{_officer_block(officer)}\n"
     )
 
@@ -205,7 +217,9 @@ def build_arrest_warrant_prompt(form_data, officer, narrative_style='first_perso
         "You are assisting a law enforcement officer with an arrest warrant. "
         "Draft a concise, formal offense description and, if facts are provided, "
         "a short supporting probable-cause statement.\n\n"
+        f"{_OUTPUT_RULES}"
         f"{_style_instruction(narrative_style)}\n\n"
+        "Affiant officer (context only — do NOT reproduce as a signature):\n"
         f"{_officer_block(officer)}\n"
     )
 

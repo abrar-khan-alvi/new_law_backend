@@ -28,6 +28,20 @@ _STOPWORDS = {
     'september', 'october', 'november', 'december',
 }
 
+# Abbreviation ⇄ full-word equivalences so "Main St" ~ "Main Street" isn't flagged.
+_ABBREV = {
+    'st': 'street', 'ave': 'avenue', 'av': 'avenue', 'rd': 'road',
+    'blvd': 'boulevard', 'dr': 'drive', 'ln': 'lane', 'ct': 'court',
+    'pkwy': 'parkway', 'hwy': 'highway', 'ste': 'suite', 'apt': 'apartment',
+    'n': 'north', 's': 'south', 'e': 'east', 'w': 'west',
+    'mr': 'mr', 'ms': 'ms',
+}
+
+
+def _canon(token: str) -> str:
+    return _ABBREV.get(token, token)
+
+
 _PROPER_NOUN = re.compile(r'\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\b')
 _NUMBER = re.compile(r'\$?\d[\d,]*(?:\.\d+)?')
 _EMAIL = re.compile(r'\b[\w.+-]+@[\w-]+\.[\w.-]+\b')
@@ -67,7 +81,7 @@ def check_narrative(narrative: str, form_data: dict, officer: dict) -> list[dict
         return []
 
     corpus = grounded_corpus(form_data, officer)
-    corpus_tokens = set(corpus.split())
+    corpus_tokens = set(_canon(t) for t in corpus.split())
     corpus_digits = set(_DIGITS.sub('', t) for t in corpus.split() if any(c.isdigit() for c in t))
 
     flags: list[dict] = []
@@ -93,7 +107,7 @@ def check_narrative(narrative: str, form_data: dict, officer: dict) -> list[dict
     }
     for m in _PROPER_NOUN.findall(narrative):
         norm = _normalize(m)
-        tokens = norm.split()
+        tokens = [_canon(t) for t in norm.split()]
         # Grounded if every word appears in the officer's text.
         if all(t in corpus_tokens for t in tokens):
             continue
