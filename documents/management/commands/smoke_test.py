@@ -112,7 +112,7 @@ class Command(BaseCommand):
         for dt, fd in payloads.items():
             r = requests.post(f'{base}/api/documents/generate/', headers=headers,
                               json={'doc_type': dt, 'narrative_style': 'third_person', 'form_data': fd},
-                              timeout=60)
+                              timeout=300)  # live model (ollama) is slower than mock
             ok = r.status_code == 201 and r.json().get('status') == 'completed'
             self._ok(f'Generate {dt}', ok, f'HTTP {r.status_code}')
             if ok:

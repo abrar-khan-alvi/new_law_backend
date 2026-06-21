@@ -47,6 +47,10 @@ class GeneratedDocument(models.Model):
     tokens_used = models.PositiveIntegerField(default=0)
     generation_time_ms = models.PositiveIntegerField(default=0)
 
+    # Post-generation leak/hallucination check: ungrounded details for officer
+    # review, e.g. [{"type": "proper_noun", "value": "DoorDash"}]. Empty = clean.
+    leak_flags = models.JSONField(default=list, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

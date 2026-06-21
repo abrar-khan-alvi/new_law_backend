@@ -39,9 +39,10 @@ THIRD_PARTY_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
+    'django_celery_beat',
+    'django_celery_results',
     # Added in later phases as modules are built:
-    # 'storages', 'django_celery_beat', 'django_celery_results',
-    # 'axes', 'drf_spectacular',
+    # 'storages', 'axes', 'drf_spectacular',
 ]
 
 LOCAL_APPS = [
@@ -200,6 +201,13 @@ LOCAL_MODEL_NAME = env('LOCAL_MODEL_NAME', default='llama3.1:8b')
 BEDROCK_MODEL_ID = env('BEDROCK_MODEL_ID', default='')
 BEDROCK_REGION = env('BEDROCK_REGION', default='us-east-1')
 
+# ── RAG / embeddings ─────────────────────────────────────────────────
+EMBEDDING_MODEL = env('EMBEDDING_MODEL', default='all-MiniLM-L6-v2')
+EMBEDDING_DIM = env.int('EMBEDDING_DIM', default=384)   # matches all-MiniLM-L6-v2
+RAG_TOP_K = env.int('RAG_TOP_K', default=3)
+RAG_CHUNK_SIZE = env.int('RAG_CHUNK_SIZE', default=1000)      # characters
+RAG_CHUNK_OVERLAP = env.int('RAG_CHUNK_OVERLAP', default=150)
+
 # ── AWS / S3 ─────────────────────────────────────────────────────────
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
@@ -239,4 +247,24 @@ LOGGING = {
         'audit': {'handlers': ['audit'], 'level': 'INFO', 'propagate': False},
     },
     'root': {'handlers': ['console'], 'level': 'INFO'},
+}
+
+# ── Celery ───────────────────────────────────────────────────────────
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_BROKER_URL = env('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = 'django-db'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+CELERY_BEAT_SCHEDULE = {
+    'reset-monthly-usage': {
+        'task': 'subscriptions.tasks.reset_monthly_usage',
+        'schedule': crontab(day_of_month=1, hour=0, minute=0),
+    },
+    'cleanup-failed-documents': {
+        'task': 'documents.tasks.cleanup_failed_documents',
+        'schedule': crontab(hour=2, minute=0),  # daily at 02:00
+    },
 }

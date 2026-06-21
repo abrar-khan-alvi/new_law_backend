@@ -10,6 +10,7 @@ class GeneratedDocumentSerializer(serializers.ModelSerializer):
             'id', 'doc_type', 'case_number', 'form_data', 'ai_narrative',
             'narrative_style', 'status', 'error_message',
             'model_used', 'tokens_used', 'generation_time_ms',
+            'leak_flags',
             'created_at', 'updated_at',
         ]
         read_only_fields = fields

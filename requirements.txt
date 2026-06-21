@@ -45,10 +45,10 @@ requests==2.32.3                 # Ollama HTTP calls
 # langchain==0.2.14
 # langchain-community==0.2.12
 # langchain-aws==0.1.18
-# sentence-transformers==3.1.0   # pulls torch — large
-# numpy==1.26.4
-# PyMuPDF==1.24.9
-python-docx==1.1.2               # DOCX export
+sentence-transformers==3.1.0     # local embeddings (RAG) — pulls torch
+numpy==1.26.4
+PyMuPDF==1.24.9                  # PDF text extraction (training-doc ingestion)
+python-docx==1.1.2               # DOCX export + parsing
 # pdfplumber==0.11.3
 # mammoth==1.8.0
 reportlab==4.2.2                 # PDF export
@@ -68,7 +68,7 @@ Markdown==3.6                    # render blog markdown
 # ════════════════════════════════════════
 # PHASE 5 — async tasks
 # ════════════════════════════════════════
-# celery==5.4.0
-# django-celery-beat==2.7.0
-# django-celery-results==2.5.1
-# flower==2.0.1
+celery==5.4.0
+django-celery-beat==2.7.0
+django-celery-results==2.5.1
+flower==2.0.1

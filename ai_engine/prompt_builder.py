@@ -1,14 +1,68 @@
 """
-INTERIM prompt builders.
+RAG-aware prompt builders (hardened against fact-leakage).
 
-These assemble a basic instruction prompt from the `ai_fuel` portions of
-form_data (see docs/FORM_DATA_SCHEMAS.md) plus the officer profile. They are
-intentionally simple — the polished, template-aware prompt engineering is a
-separate planned task. Keep call signatures stable so swapping in the real
-builders later requires no view changes.
+Each builder assembles the model instruction from:
+  1. a task framing + style (person) instruction,
+  2. the auto-injected officer/department profile,
+  3. read-only structured context (grounding — names, roles, offenses),
+  4. a STYLE REFERENCE retrieved from this agency's indexed training documents
+     (pgvector RAG) — SANITIZED and framed as style-only, placed BEFORE the facts,
+  5. the `ai_fuel` FACTS the model must expand — delimited and placed LAST so they
+     are the freshest, authoritative context,
+  6. a closing anti-leak instruction.
 
-Signature for all builders: (form_data: dict, officer: dict, narrative_style: str) -> str
+Anti-leakage design (an 8B model will otherwise copy concrete details from a
+similar example):
+  - retrieved chunks are run through `_sanitize_examples()` which redacts emails,
+    phones, SSNs, currency amounts, dates, times, case/ID numbers, and IPs;
+  - the examples are explicitly framed as "different, unrelated cases — style only";
+  - facts come AFTER the examples (recency), and a final instruction forbids
+    importing any entity not present in the FACTS block.
+
+This reduces but cannot fully guarantee zero leakage; a post-generation entity
+check (comparing narrative entities to form_data) is the belt-and-suspenders
+follow-up. Retrieval is best-effort: if nothing is indexed (or RAG fails) the
+builder degrades to a clean, example-free prompt.
+
+Signature for all builders (unchanged): (form_data, officer, narrative_style) -> str
 """
+import logging
+import re
+
+logger = logging.getLogger(__name__)
+
+# ── PII / identifier redaction (applied to retrieved style examples) ──────
+# Order matters: more specific patterns first so they win over generic ones.
+_REDACTIONS = [
+    (re.compile(r'\b[\w.+-]+@[\w-]+\.[\w.-]+\b'), '[EMAIL]'),
+    (re.compile(r'\b\d{1,3}(?:\.\d{1,3}){3}\b'), '[IP]'),
+    (re.compile(r'\b\d{3}-\d{2}-\d{4}\b'), '[SSN]'),
+    (re.compile(r'\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b'), '[PHONE]'),
+    (re.compile(r'\$\s?\d[\d,]*(?:\.\d+)?'), '[AMOUNT]'),
+    # Month-name dates: "January 6, 2026"
+    (re.compile(r'\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\b', re.I), '[DATE]'),
+    (re.compile(r'\b\d{4}-\d{2}-\d{2}\b'), '[DATE]'),            # ISO date
+    (re.compile(r'\b\d{1,2}/\d{1,2}/\d{2,4}\b'), '[DATE]'),     # slash date
+    (re.compile(r'\bIR\s*#?\s*\d+\b', re.I), '[CASE]'),         # incident #
+    (re.compile(r'\b\d{2}-\d{5,6}\b'), '[CASE]'),              # e.g. 18-100301
+    (re.compile(r'\b\d{1,2}:\d{2}\s*(?:[AaPp]\.?[Mm]\.?)?\b'), '[TIME]'),  # HH:MM
+    (re.compile(r'\b\d{3,4}\s*hours?\b', re.I), '[TIME]'),     # "1930 hours"
+    (re.compile(r'\b\d{6,}\b'), '[ID]'),                       # long id/badge runs
+]
+
+_ANTI_LEAK = (
+    "\nIMPORTANT — write the narrative using ONLY the facts in the FACTS block "
+    "above. The writing samples described DIFFERENT, unrelated cases and were "
+    "provided solely to guide tone, structure, paragraph flow, and terminology. "
+    "Do NOT import any name, person, place, address, item, brand, amount, date, "
+    "time, or event from the samples unless it also appears in the FACTS block.\n"
+)
+
+
+def _sanitize_examples(text: str) -> str:
+    for pattern, repl in _REDACTIONS:
+        text = pattern.sub(repl, text)
+    return text
 
 
 def _officer_block(officer: dict) -> str:
@@ -27,15 +81,68 @@ def _style_instruction(narrative_style: str) -> str:
     return "Write in the first person (I, my), from the officer's perspective."
 
 
+def _style_reference(query: str, doc_type: str) -> str:
+    """
+    Pull the most similar excerpts from this agency's indexed training docs,
+    SANITIZE them, and wrap them as a style-only reference. Returns '' when
+    nothing is indexed or RAG fails.
+    """
+    try:
+        from .rag_pipeline import retrieve_style_examples
+        examples = retrieve_style_examples(query, doc_type=doc_type)
+    except Exception as exc:  # noqa: BLE001 — RAG is an enhancement, never a hard dependency
+        logger.warning('RAG style retrieval failed (%s); continuing without examples', exc)
+        return ''
+
+    if not examples.strip():
+        return ''
+
+    examples = _sanitize_examples(examples)
+    label = doc_type.replace('_', ' ')
+    return (
+        f"\nWRITING-STYLE SAMPLES — excerpts from prior {label} documents written "
+        "by this agency, shown ONLY so you can match their tone, sentence structure, "
+        "paragraph flow, and terminology. These describe DIFFERENT, unrelated cases. "
+        "Identifiers have been redacted as [TAGS]. Treat NONE of their content as "
+        "facts for the current report.\n"
+        "<<<BEGIN STYLE SAMPLES\n"
+        f"{examples}\n"
+        "END STYLE SAMPLES>>>\n"
+    )
+
+
+# ── Incident report ──────────────────────────────────────────────────
 def build_incident_report_prompt(form_data, officer, narrative_style='first_person'):
     facts = form_data.get('facts', {})
-    return (
+    incident = form_data.get('incident', {})
+    parties = form_data.get('involved_parties', [])
+
+    categories = ', '.join(incident.get('categories', []))
+    party_lines = '\n'.join(
+        f"- {p.get('role', 'other')}: {p.get('full_name', '')}"
+        + (f" (ID {p['id_number']})" if p.get('id_number') else '')
+        for p in parties
+    ) or '- (none listed)'
+
+    header = (
         "You are assisting a law enforcement officer in drafting the NARRATIVE "
-        "section of an incident report. Use only the facts provided; do not invent "
-        "details. Be objective, chronological, and professional.\n\n"
+        "section of an incident report. Be objective, chronological, and "
+        "professional. Use 24-hour time.\n\n"
         f"{_style_instruction(narrative_style)}\n\n"
         f"{_officer_block(officer)}\n"
-        "Facts:\n"
+        "Incident context (for accuracy):\n"
+        f"- Categories: {categories or 'N/A'}\n"
+        f"- Date/Time: {incident.get('date', '')} {incident.get('time', '')}\n"
+        f"- Location: {incident.get('location', '')}\n"
+        "Involved parties:\n"
+        f"{party_lines}\n"
+    )
+
+    query = ' '.join(filter(None, [facts.get('what', ''), facts.get('who', ''), categories]))
+    style = _style_reference(query, 'incident_report')
+
+    facts_block = (
+        "\n=== FACTS (the ONLY source of truth for this report) ===\n"
         f"- Who: {facts.get('who', '')}\n"
         f"- What: {facts.get('what', '')}\n"
         f"- When: {facts.get('when', '')}\n"
@@ -43,47 +150,79 @@ def build_incident_report_prompt(form_data, officer, narrative_style='first_pers
         f"- Why: {facts.get('why', '')}\n"
         f"- How: {facts.get('how', '')}\n"
         f"- Officer actions: {facts.get('officer_actions', '')}\n"
-        f"- Additional notes: {facts.get('additional_notes', '')}\n\n"
-        "Write the narrative now:"
+        f"- Additional notes: {facts.get('additional_notes', '')}\n"
+        "=== END FACTS ===\n"
     )
 
+    return header + style + facts_block + _ANTI_LEAK + "\nWrite the narrative now:"
 
+
+# ── Search warrant ───────────────────────────────────────────────────
 def build_search_warrant_prompt(form_data, officer, narrative_style='first_person'):
     pc = form_data.get('probable_cause', {})
     offenses = ', '.join(
         f"{o.get('code_section', '')} ({o.get('description', '')})"
         for o in form_data.get('offenses', [])
     )
-    return (
+    place = form_data.get('place_to_search', {})
+
+    header = (
         "You are assisting a law enforcement officer in drafting the AFFIDAVIT "
-        "(statement of probable cause) for a search warrant. Use only the facts "
-        "provided; do not invent details. Be precise and factual.\n\n"
+        "(statement of probable cause) for a search warrant. Be precise and "
+        "factual, and establish a clear nexus between the offenses and the place "
+        "to be searched.\n\n"
         f"{_style_instruction(narrative_style)}\n\n"
         f"{_officer_block(officer)}\n"
-        f"Offenses: {offenses}\n"
-        f"Place to search: {form_data.get('place_to_search', {}).get('description', '')}\n"
-        f"Affiant background: {pc.get('affiant_background', '')}\n"
-        f"Investigation summary: {pc.get('investigation_summary', '')}\n"
-        f"Timeline: {'; '.join(pc.get('timeline', []))}\n"
-        f"Nexus to place: {pc.get('nexus_to_place', '')}\n\n"
-        "Write the statement of probable cause now:"
+    )
+
+    query = ' '.join(filter(None, [pc.get('investigation_summary', ''), offenses,
+                                   pc.get('nexus_to_place', '')]))
+    style = _style_reference(query, 'search_warrant')
+
+    facts_block = (
+        "\n=== FACTS (the ONLY source of truth for this affidavit) ===\n"
+        f"- Offenses: {offenses}\n"
+        f"- Place to search: {place.get('description', '')} — {place.get('address', '')}\n"
+        f"- Affiant background: {pc.get('affiant_background', '')}\n"
+        f"- Investigation summary: {pc.get('investigation_summary', '')}\n"
+        f"- Timeline: {'; '.join(pc.get('timeline', []))}\n"
+        f"- Nexus to place: {pc.get('nexus_to_place', '')}\n"
+        f"- Prior warrants: {pc.get('prior_warrants', '') or 'none'}\n"
+        "=== END FACTS ===\n"
+    )
+
+    return header + style + facts_block + _ANTI_LEAK + (
+        "\nWrite the statement of probable cause now:"
     )
 
 
+# ── Arrest warrant ───────────────────────────────────────────────────
 def build_arrest_warrant_prompt(form_data, officer, narrative_style='first_person'):
     offense = form_data.get('offense', {})
     pc = form_data.get('probable_cause', {})
-    return (
+
+    header = (
         "You are assisting a law enforcement officer with an arrest warrant. "
         "Draft a concise, formal offense description and, if facts are provided, "
-        "a short supporting probable-cause statement. Use only the facts provided.\n\n"
+        "a short supporting probable-cause statement.\n\n"
         f"{_style_instruction(narrative_style)}\n\n"
         f"{_officer_block(officer)}\n"
-        f"Defendant: {form_data.get('defendant', {}).get('full_name', '')}\n"
-        f"Offense: {offense.get('code_section', '')} — {offense.get('brief_description', '')}\n"
-        f"Facts: {pc.get('facts', '')}\n"
-        f"Timeline: {'; '.join(pc.get('timeline', []))}\n\n"
-        "Write the offense description (and probable-cause statement if applicable) now:"
+    )
+
+    query = ' '.join(filter(None, [offense.get('brief_description', ''), pc.get('facts', '')]))
+    style = _style_reference(query, 'arrest_warrant')
+
+    facts_block = (
+        "\n=== FACTS (the ONLY source of truth for this warrant) ===\n"
+        f"- Defendant: {form_data.get('defendant', {}).get('full_name', '')}\n"
+        f"- Offense: {offense.get('code_section', '')} — {offense.get('brief_description', '')}\n"
+        f"- Facts: {pc.get('facts', '') or '(none)'}\n"
+        f"- Timeline: {'; '.join(pc.get('timeline', []))}\n"
+        "=== END FACTS ===\n"
+    )
+
+    return header + style + facts_block + _ANTI_LEAK + (
+        "\nWrite the offense description (and probable-cause statement if applicable) now:"
     )
 
 

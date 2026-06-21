@@ -43,6 +43,56 @@ services:
       DB_USER: le_user
       DB_PASSWORD: devpassword123
       REDIS_URL: redis://redis:6379/0
+      # AI_MODE stays in .env (default 'mock'). This just makes host-Ollama
+      # reachable from inside the container when you flip AI_MODE=ollama.
+      LOCAL_MODEL_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  celery:
+    build: .
+    command: celery -A core worker --loglevel=info
+    volumes:
+      - .:/app
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: core.settings.development
+      USE_SQLITE: "False"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: law_enforcement_db
+      DB_USER: le_user
+      DB_PASSWORD: devpassword123
+      REDIS_URL: redis://redis:6379/0
+      LOCAL_MODEL_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  celery-beat:
+    build: .
+    command: celery -A core beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - .:/app
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: core.settings.development
+      USE_SQLITE: "False"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: law_enforcement_db
+      DB_USER: le_user
+      DB_PASSWORD: devpassword123
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       db:
         condition: service_healthy

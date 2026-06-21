@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.permissions import IsOfficer, IsOwnerOrAdmin
+from ai_engine.leak_check import check_narrative
 from ai_engine.model_client import ModelClient
 from ai_engine.prompt_builder import PROMPT_BUILDERS
 from subscriptions.models import UsageLog
@@ -49,13 +50,17 @@ def _officer_profile(user) -> dict:
 
 def _run_generation(doc, narrative_style, temperature=0.2):
     """Build the prompt, call the model, persist the narrative. Raises on failure."""
+    officer = _officer_profile(doc.user)
     builder = PROMPT_BUILDERS[doc.doc_type]
-    prompt = builder(doc.form_data, _officer_profile(doc.user), narrative_style)
+    prompt = builder(doc.form_data, officer, narrative_style)
 
     start = time.time()
     client = ModelClient()
     ai_text = client.generate(prompt, max_tokens=3000, temperature=temperature)
     elapsed = int((time.time() - start) * 1000)
+
+    # Deterministic post-generation leak/hallucination check (flags, never edits).
+    doc.leak_flags = check_narrative(ai_text, doc.form_data, officer)
 
     doc.ai_narrative = ai_text
     doc.status = GeneratedDocument.Status.COMPLETED

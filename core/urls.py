@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/auth/', include('accounts.urls')),
     path('api/documents/', include('documents.urls')),
     path('api/blog/', include('blog.urls')),
+    path('api/ai/', include('ai_engine.urls')),
     path('api/subscriptions/', include('subscriptions.urls')),
     path('api/payments/', include('payments.urls')),
     path('api/admin-panel/', include('admin_panel.urls')),

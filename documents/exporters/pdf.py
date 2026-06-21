@@ -7,6 +7,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import (
+    PageBreak,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -166,7 +167,59 @@ _BUILDERS = {
 }
 
 
+def render_sw_attachments(form_data, narrative, officer) -> bytes:
+    """Attachment A (place), Attachment B (items), and the Affidavit — the pages
+    that accompany the official AO 93 face form."""
+    place = form_data.get('place_to_search', {})
+    items = form_data.get('items_to_seize', [])
+
+    story = [
+        _p('ATTACHMENT A — Property to be Searched', _TITLE), Spacer(1, 8),
+        _p(place.get('description', '-')),
+        _p(f"Location: {place.get('address', '-')}"),
+        PageBreak(),
+        _p('ATTACHMENT B — Items to be Seized', _TITLE), Spacer(1, 8),
+    ]
+    story += [_p(f"{chr(97 + i)}. {it}") for i, it in enumerate(items)] or [_p('-')]
+    story += [
+        PageBreak(),
+        _p('AFFIDAVIT — Statement of Probable Cause', _TITLE), Spacer(1, 8),
+    ] + _narrative_paragraphs(narrative) + _sig_block(officer)
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=letter,
+        leftMargin=0.9 * inch, rightMargin=0.9 * inch,
+        topMargin=0.8 * inch, bottomMargin=0.8 * inch,
+    )
+    doc.build(story)
+    return buf.getvalue()
+
+
+def render_simple_pdf(title, narrative, officer) -> bytes:
+    """A standalone titled narrative document (e.g. a supporting affidavit)."""
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=letter,
+        leftMargin=0.9 * inch, rightMargin=0.9 * inch,
+        topMargin=0.8 * inch, bottomMargin=0.8 * inch,
+    )
+    story = _header(officer) + [_p(title, _TITLE), Spacer(1, 8)]
+    story += _narrative_paragraphs(narrative)
+    story += _sig_block(officer)
+    doc.build(story)
+    return buf.getvalue()
+
+
 def render_pdf(doc_type, form_data, narrative, officer) -> bytes:
+    # Court forms use the official templates (filled / overlaid), not redrawn.
+    if doc_type == 'arrest_warrant':
+        from .ao_forms import fill_arrest_warrant
+        return fill_arrest_warrant(form_data, narrative, officer)
+    if doc_type == 'search_warrant':
+        from .ao_forms import fill_search_warrant
+        return fill_search_warrant(form_data, narrative, officer)
+
     builder = _BUILDERS.get(doc_type)
     if builder is None:
         raise ValueError(f'No PDF template for doc_type {doc_type}')
