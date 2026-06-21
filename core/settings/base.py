@@ -181,6 +181,12 @@ EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 EMAIL_TIMEOUT = env.int('EMAIL_TIMEOUT', default=15)
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@example.com')
 
+# ── OTP (numeric email codes for verification + password reset) ──────
+OTP_LENGTH = env.int('OTP_LENGTH', default=6)
+OTP_TTL_MINUTES = env.int('OTP_TTL_MINUTES', default=10)
+OTP_MAX_ATTEMPTS = env.int('OTP_MAX_ATTEMPTS', default=5)
+OTP_RESEND_COOLDOWN_SECONDS = env.int('OTP_RESEND_COOLDOWN_SECONDS', default=60)
+
 # ── JWT (djangorestframework-simplejwt) ──────────────────────────────
 from datetime import timedelta  # noqa: E402
 

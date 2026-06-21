@@ -1,5 +1,7 @@
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
 
 from .managers import UserManager
 
@@ -84,3 +86,35 @@ class User(AbstractUser):
         if not sub:
             return False
         return sub.documents_generated_this_month < sub.plan.document_limit
+
+
+class EmailOTP(models.Model):
+    """
+    A numeric one-time code emailed to a user for email verification or password
+    reset. The code itself is never stored — only an HMAC hash (see accounts.otp).
+    """
+
+    class Purpose(models.TextChoices):
+        EMAIL_VERIFICATION = 'email_verification', 'Email Verification'
+        PASSWORD_RESET = 'password_reset', 'Password Reset'
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='otps',
+    )
+    purpose = models.CharField(max_length=32, choices=Purpose.choices)
+    code_hash = models.CharField(max_length=64)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    used = models.BooleanField(default=False)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'email_otps'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['user', 'purpose', 'used'])]
+
+    def __str__(self):
+        return f"{self.purpose} for {self.user_id} ({'used' if self.used else 'active'})"
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at

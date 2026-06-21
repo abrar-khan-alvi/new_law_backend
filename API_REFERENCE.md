@@ -15,8 +15,8 @@ Roles: `free`, `officer`, `admin`. Most document routes require an **officer** (
 ---
 
 ## Postman quick-start
-1. `POST /api/auth/register/` → create an officer account.
-2. Verify email (dev: see the link in the backend logs, or have an admin verify) — login is blocked until `email_verified` is true.
+1. `POST /api/auth/register/` → create an officer account (a 6-digit OTP is emailed).
+2. `POST /api/auth/verify-email/` with `{ email, code }` — login is blocked until `email_verified` is true. (Or have an admin verify the account.)
 3. `POST /api/auth/login/` → copy `access`. Set a Postman collection variable `token`.
 4. Add header `Authorization: Bearer {{token}}` to protected requests.
 5. `POST /api/documents/generate/` → generate. `POST /api/documents/{id}/export/` → download PDF/DOCX.
@@ -56,10 +56,13 @@ Create an account (role defaults to `officer`). Sends a verification email.
 ```
 
 ### POST `/api/auth/verify-email/` — public
-**Request:** `{ "uid": "<from email link>", "token": "<from email link>" }`
+Verify with the **numeric OTP code** emailed on registration (default 6 digits, expires in 10 min).
+**Request:** `{ "email": "officer@dept.gov", "code": "123456" }`
 **Response `200`:** `{ "message": "Email verified. You can now log in." }`
+**Errors `400`:** `{ "error": "Invalid code." }` / `Code expired...` / `Too many attempts...`
 
 ### POST `/api/auth/resend-verification/` — public
+Re-sends a fresh OTP (rate-limited; default 60s cooldown).
 **Request:** `{ "email": "officer@dept.gov" }`
 **Response `200`:** `{ "message": "If the account exists and is unverified, an email was sent." }`
 
@@ -117,8 +120,10 @@ Update editable profile fields (any subset).
 **Response `200`:** `{ "message": "If the account exists, a reset email was sent." }`
 
 ### POST `/api/auth/password-reset/confirm/` — public
-**Request:** `{ "uid": "<from email>", "token": "<from email>", "new_password": "NewPass789!" }`
+Confirm with the **numeric OTP code** emailed by `/password-reset/`.
+**Request:** `{ "email": "officer@dept.gov", "code": "123456", "new_password": "NewPass789!" }`
 **Response `200`:** `{ "message": "Password has been reset. You can now log in." }`
+**Errors `400`:** `{ "error": "Invalid code." }` / `Code expired...`
 
 ### POST `/api/auth/verify-officer/<pk>/` — 🔒 admin
 Vets an officer account (`is_verified=true`).

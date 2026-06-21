@@ -1,7 +1,4 @@
-from django.contrib.auth.tokens import default_token_generator
 from django.utils import timezone
-from django.utils.encoding import force_str
-from django.utils.http import urlsafe_base64_decode
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -10,7 +7,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .emails import send_password_reset_email, send_verification_email
-from .models import User
+from .models import EmailOTP, User
+from .otp import seconds_until_resend, verify_otp
 from .permissions import IsAdmin
 from .serializers import (
     ChangePasswordSerializer,
@@ -22,15 +20,6 @@ from .serializers import (
     UserUpdateSerializer,
     VerifyEmailSerializer,
 )
-from .tokens import email_verification_token
-
-
-def _user_from_uid(uidb64):
-    try:
-        uid = force_str(urlsafe_base64_decode(uidb64))
-        return User.objects.get(pk=uid)
-    except (User.DoesNotExist, ValueError, TypeError, OverflowError):
-        return None
 
 
 class RegisterView(APIView):
@@ -59,13 +48,16 @@ class VerifyEmailView(APIView):
         serializer = VerifyEmailSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = _user_from_uid(serializer.validated_data['uid'])
+        user = User.objects.filter(email=serializer.validated_data['email']).first()
         if user is None:
-            return Response({'error': 'Invalid verification link.'}, status=400)
+            return Response({'error': 'Invalid code.'}, status=400)
         if user.email_verified:
             return Response({'message': 'Email already verified.'})
-        if not email_verification_token.check_token(user, serializer.validated_data['token']):
-            return Response({'error': 'Invalid or expired token.'}, status=400)
+
+        ok, message = verify_otp(
+            user, EmailOTP.Purpose.EMAIL_VERIFICATION, serializer.validated_data['code'])
+        if not ok:
+            return Response({'error': message}, status=400)
 
         user.email_verified = True
         user.save(update_fields=['email_verified'])
@@ -80,8 +72,11 @@ class ResendVerificationView(APIView):
     def post(self, request):
         email = request.data.get('email', '')
         user = User.objects.filter(email=email).first()
-        # Always return the same response (don't leak which emails exist).
-        if user and not user.email_verified:
+        # Always return the same response (don't leak which emails exist), and
+        # respect the resend cooldown to prevent code spamming.
+        if user and not user.email_verified and not seconds_until_resend(
+            user, EmailOTP.Purpose.EMAIL_VERIFICATION
+        ):
             send_verification_email(user)
         return Response({'message': 'If the account exists and is unverified, an email was sent.'})
 
@@ -158,11 +153,14 @@ class PasswordResetConfirmView(APIView):
         serializer = PasswordResetConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = _user_from_uid(serializer.validated_data['uid'])
-        if user is None or not default_token_generator.check_token(
-            user, serializer.validated_data['token']
-        ):
-            return Response({'error': 'Invalid or expired reset link.'}, status=400)
+        user = User.objects.filter(email=serializer.validated_data['email']).first()
+        if user is None:
+            return Response({'error': 'Invalid code.'}, status=400)
+
+        ok, message = verify_otp(
+            user, EmailOTP.Purpose.PASSWORD_RESET, serializer.validated_data['code'])
+        if not ok:
+            return Response({'error': message}, status=400)
 
         user.set_password(serializer.validated_data['new_password'])
         user.save(update_fields=['password'])
