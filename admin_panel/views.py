@@ -8,11 +8,16 @@ from rest_framework.views import APIView
 from accounts.models import User
 from accounts.permissions import IsAdmin
 from documents.models import GeneratedDocument
+from documents.serializers import GeneratedDocumentSerializer
 from subscriptions.models import Plan, Subscription
 from subscriptions.serializers import PlanSerializer
 from utils.pagination import StandardPagination
 
-from .serializers import AdminUserSerializer, AdminUserUpdateSerializer
+from .serializers import (
+    AdminDocumentSerializer,
+    AdminUserSerializer,
+    AdminUserUpdateSerializer,
+)
 
 
 class PlatformStatsView(APIView):
@@ -93,6 +98,42 @@ class PlanDetailView(APIView):
             )
         plan.delete()
         return Response(status=204)
+
+
+class DocumentManagementView(APIView):
+    """
+    GET /api/admin-panel/documents/ — every officer's documents (paginated).
+    Filters: ?q=<user email>, ?doc_type=, ?status=, ?flagged=true (leak_flags only).
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        qs = GeneratedDocument.objects.select_related('user').all()
+        q = request.GET.get('q')
+        if q:
+            qs = qs.filter(user__email__icontains=q)
+        doc_type = request.GET.get('doc_type')
+        if doc_type:
+            qs = qs.filter(doc_type=doc_type)
+        status_f = request.GET.get('status')
+        if status_f:
+            qs = qs.filter(status=status_f)
+        if str(request.GET.get('flagged', '')).lower() in ('true', '1'):
+            qs = qs.exclude(leak_flags=[])
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(qs, request)
+        return paginator.get_paginated_response(AdminDocumentSerializer(page, many=True).data)
+
+
+class DocumentDetailAdminView(APIView):
+    """GET /api/admin-panel/documents/<pk>/ — full document (any user's)."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request, pk):
+        doc = GeneratedDocument.objects.filter(pk=pk).first()
+        if not doc:
+            return Response({'error': {'detail': 'Document not found.'}}, status=404)
+        return Response(GeneratedDocumentSerializer(doc).data)
 
 
 class UserManagementView(APIView):

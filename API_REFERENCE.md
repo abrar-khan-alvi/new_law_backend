@@ -309,11 +309,15 @@ Parses text, stores the file, and queues async embedding/indexing into pgvector.
 ```json
 [
   { "id": 1, "name": "free", "display_name": "Free", "description": "...",
-    "price_monthly": "0.00", "price_yearly": "0.00", "document_limit": 3,
+    "price_monthly": "0.00", "price_yearly": "0.00", "document_limit": 5,
     "can_incident_report": true, "can_search_warrant": false, "can_arrest_warrant": false,
     "can_export_pdf": true, "can_export_docx": false, "can_save_history": true,
     "can_regenerate": false, "support_level": "community", "is_active": true, "sort_order": 0 }
 ]
+```
+Three active tiers: **Free** ($0, 5 docs/mo, incident + PDF only), **Standard** ($29/mo · $290/yr, 50 docs/mo, all doc types + DOCX + regenerate), **Pro** ($59/mo · $590/yr, unlimited + priority support).
+```jsonc
+// (full list returns all three; fields per item as shown above)
 ```
 
 ### GET `/api/subscriptions/status/` — auth
@@ -385,6 +389,21 @@ Paginated. Filters: `?q=<email substring>`, `?role=officer`.
 Activate/deactivate, set role, verify.
 **Request (any subset):** `{ "is_active": false }` or `{ "role": "officer", "is_verified": true }`
 **Response `200`:** the updated admin-user object.
+
+### GET `/api/admin-panel/documents/` — 🔒 admin
+Every officer's documents (paginated). Filters: `?q=<user email>`, `?doc_type=incident_report|search_warrant|arrest_warrant`, `?status=completed|failed|...`, `?flagged=true` (only docs with leak flags).
+**Response `200`:**
+```json
+{ "count": 30, "next": null, "previous": null,
+  "results": [
+    { "id": "uuid", "user_email": "officer@dept.gov", "doc_type": "incident_report",
+      "case_number": "LE-A2JUHQNCKE", "status": "completed", "narrative_style": "third_person",
+      "model_used": "llama3.1:8b", "generation_time_ms": 95304, "leak_flag_count": 1,
+      "created_at": "2026-06-20T10:05:00Z" } ] }
+```
+
+### GET `/api/admin-panel/documents/<uuid:pk>/` — 🔒 admin
+Full document for **any** user (same shape as the document generate `201` response, incl. `ai_narrative`, `form_data`, `leak_flags`).
 
 ---
 

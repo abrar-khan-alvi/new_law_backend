@@ -32,7 +32,6 @@ training_data.jsonl
 
 # IDE
 .idea/
-.vscode/
 *.swp
 *.swo
 
@@ -43,3 +42,7 @@ htmlcov/
 
 # Sample LE documents — contain PII, kept out of the repo
 docs/
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+.gitignore
