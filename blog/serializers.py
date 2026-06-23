@@ -60,6 +60,7 @@ class BlogPostCreateSerializer(serializers.ModelSerializer):
         fields = [
             'title', 'content', 'excerpt', 'category', 'cover_image',
             'meta_title', 'meta_description', 'is_featured', 'tags',
+            'is_published',
         ]
 
     def _apply_tags(self, post, tag_names):
