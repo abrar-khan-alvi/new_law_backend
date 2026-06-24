@@ -24,9 +24,10 @@ def create_free_subscription(sender, instance, created, **kwargs):
     if hasattr(instance, 'subscription'):
         return
 
-    free_plan = Plan.objects.filter(name='free').first()
+    # Pick the lowest priced active plan instead of hardcoding 'free'
+    free_plan = Plan.objects.filter(is_active=True).order_by('price_monthly').first()
     if not free_plan:
-        logger.warning("No 'free' plan found — run `manage.py seed_plans`.")
+        logger.warning("No active plans found to assign as default.")
         return
 
     Subscription.objects.create(user=instance, plan=free_plan, status='active')
