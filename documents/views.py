@@ -1,13 +1,14 @@
 import time
 
 import shortuuid
+from django.conf import settings
 from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsOfficer, IsOwnerOrAdmin
+from accounts.permissions import IsVerifiedOfficer, IsOwnerOrAdmin
 from ai_engine.leak_check import check_narrative
 from ai_engine.model_client import ModelClient
 from ai_engine.postprocess import clean_narrative
@@ -76,7 +77,7 @@ def _run_generation(doc, narrative_style, temperature=0.2):
 
 class GenerateDocumentView(APIView):
     """POST /api/documents/generate/ — create + generate a document."""
-    permission_classes = [IsOfficer]
+    permission_classes = [IsVerifiedOfficer]
 
     def post(self, request):
         serializer = GenerateRequestSerializer(data=request.data)
@@ -144,7 +145,7 @@ class GenerateDocumentView(APIView):
 
 class RegenerateDocumentView(APIView):
     """POST /api/documents/<pk>/regenerate/ — re-run generation for a document."""
-    permission_classes = [IsOfficer]
+    permission_classes = [IsVerifiedOfficer]
 
     def post(self, request, pk):
         try:
@@ -180,7 +181,7 @@ class RegenerateDocumentView(APIView):
 
 class DocumentListView(APIView):
     """GET /api/documents/ — current officer's document history (paginated)."""
-    permission_classes = [IsOfficer]
+    permission_classes = [IsVerifiedOfficer]
 
     def get(self, request):
         qs = GeneratedDocument.objects.filter(user=request.user)
@@ -209,7 +210,7 @@ class ExportDocumentView(APIView):
     POST /api/documents/<pk>/export/
     Body: {"format": "pdf"|"docx", "edited_text": "<optional officer-edited narrative>"}
     """
-    permission_classes = [IsOfficer]
+    permission_classes = [IsVerifiedOfficer]
 
     def post(self, request, pk):
         try:
@@ -222,9 +223,9 @@ class ExportDocumentView(APIView):
             return Response(
                 {'error': {'detail': 'Invalid format. Use pdf or docx.'}}, status=400)
 
-        # Plan-based export gating (admins bypass).
+        # Plan-based export gating (admins bypass). Bypass entirely in development (DEBUG).
         user = request.user
-        if user.role != 'admin':
+        if user.role != 'admin' and not getattr(settings, 'DEBUG', False):
             plan = getattr(getattr(user, 'subscription', None), 'plan', None)
             allowed = plan and (
                 plan.can_export_pdf if export_format == 'pdf' else plan.can_export_docx

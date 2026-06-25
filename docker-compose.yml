@@ -21,6 +21,22 @@ services:
     ports:
       - "6379:6379"
 
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  ollama-pull-model:
+    image: ollama/ollama
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: /bin/sh
+    command: -c "until ollama list >/dev/null 2>&1; do echo 'Waiting for Ollama to start...'; sleep 2; done && ollama pull llama3.1:8b"
+    depends_on:
+      - ollama
+
   backend:
     build: .
     command: >
@@ -43,9 +59,8 @@ services:
       DB_USER: le_user
       DB_PASSWORD: devpassword123
       REDIS_URL: redis://redis:6379/0
-      # AI_MODE stays in .env (default 'mock'). This just makes host-Ollama
-      # reachable from inside the container when you flip AI_MODE=ollama.
-      LOCAL_MODEL_URL: http://host.docker.internal:11434
+      # AI_MODE stays in .env (default 'mock').
+      LOCAL_MODEL_URL: http://ollama:11434
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -69,7 +84,7 @@ services:
       DB_USER: le_user
       DB_PASSWORD: devpassword123
       REDIS_URL: redis://redis:6379/0
-      LOCAL_MODEL_URL: http://host.docker.internal:11434
+      LOCAL_MODEL_URL: http://ollama:11434
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -101,3 +116,4 @@ services:
 
 volumes:
   postgres_data:
+  ollama_data:
