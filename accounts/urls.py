@@ -13,9 +13,12 @@ from .views import (
     UserListView,
     VerifyEmailView,
     VerifyOfficerView,
+    AgencyCreateView,
 )
 
 urlpatterns = [
+    # Agency configuration
+    path('agencies/', AgencyCreateView.as_view()),
     # Registration & email verification
     path('register/', RegisterView.as_view()),
     path('verify-email/', VerifyEmailView.as_view()),

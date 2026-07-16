@@ -2,7 +2,17 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import User
+from .models import User, Agency
+
+class AgencySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Agency
+        fields = [
+            'id', 'name', 'jurisdiction_type', 'state', 'county', 'city',
+            'court_name', 'judicial_district', 'division', 'court_caption',
+            'judge_title', 'prosecuting_authority', 'case_number_format',
+            'ori', 'default_legal_citations'
+        ]
 
 
 # ── Profile ──────────────────────────────────────────────────────────
@@ -18,12 +28,13 @@ class SubscriptionBriefSerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     subscription = SubscriptionBriefSerializer(read_only=True)
     full_name = serializers.ReadOnlyField()
+    agency = AgencySerializer(read_only=True)
 
     class Meta:
         model = User
         fields = [
             'id', 'email', 'full_name', 'first_name', 'last_name',
-            'role', 'badge_number', 'department_name', 'department_address',
+            'role', 'agency', 'badge_number', 'department_name', 'department_address',
             'department_state', 'ori', 'phone_number', 'rank', 'division',
             'email_verified', 'is_verified', 'subscription',
             'last_active', 'created_at',
@@ -80,10 +91,11 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     def validate(self, attrs):
         data = super().validate(attrs)
-        if not self.user.email_verified:
+        if self.user.role != 'admin' and not self.user.email_verified:
             raise serializers.ValidationError(
                 'Email not verified. Please check your inbox for the verification link.'
             )
+
         from django.utils import timezone
         self.user.last_active = timezone.now()
         self.user.save(update_fields=['last_active'])

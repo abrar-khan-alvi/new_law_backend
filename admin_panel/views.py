@@ -164,6 +164,23 @@ class UserDetailView(APIView):
         user = User.objects.filter(pk=pk).first()
         if not user:
             return Response({'error': {'detail': 'User not found.'}}, status=404)
+
+        # Update subscription plan if provided
+        new_plan_name = request.data.get('plan')
+        if new_plan_name:
+            plan = Plan.objects.filter(name__iexact=new_plan_name).first()
+            if plan:
+                subscription, created = Subscription.objects.get_or_create(
+                    user=user,
+                    defaults={'plan': plan, 'status': 'active'}
+                )
+                if not created:
+                    subscription.plan = plan
+                    subscription.status = 'active'
+                    subscription.save()
+            else:
+                return Response({'error': {'detail': f'Plan "{new_plan_name}" not found.'}}, status=400)
+
         serializer = AdminUserUpdateSerializer(user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         # Stamp verification metadata when newly verifying.

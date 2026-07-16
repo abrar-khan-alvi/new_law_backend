@@ -19,6 +19,7 @@ from .serializers import (
     UserProfileSerializer,
     UserUpdateSerializer,
     VerifyEmailSerializer,
+    AgencySerializer,
 )
 
 
@@ -114,6 +115,24 @@ class ProfileView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(UserProfileSerializer(request.user).data)
+
+
+class AgencyCreateView(APIView):
+    """POST /api/auth/agencies/ — create an agency and link it to the current officer."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if request.user.agency:
+            return Response({'error': 'You are already assigned to an agency.'}, status=400)
+            
+        serializer = AgencySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        agency = serializer.save()
+        
+        request.user.agency = agency
+        request.user.save(update_fields=['agency'])
+        
+        return Response(AgencySerializer(agency).data, status=status.HTTP_201_CREATED)
 
 
 class ChangePasswordView(APIView):

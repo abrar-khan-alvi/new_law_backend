@@ -139,7 +139,7 @@ def fill_search_warrant(form_data, narrative, officer) -> bytes:
     else:
         put(45, 512, 'X', 11)
     # Return to <magistrate judge>
-    put(250, 593, court.get('judge_name', ''))
+    put(430, 593, court.get('judge_name', ''))
 
     # Append Attachment A / B / Affidavit pages.
     from .pdf import render_sw_attachments

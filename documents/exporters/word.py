@@ -52,29 +52,102 @@ def _signature(doc, officer):
 # ── Incident report ──────────────────────────────────────────────────
 def _incident(doc, form_data, narrative, officer):
     inc = form_data.get('incident', {})
-    _header(doc, officer)
-    _title(doc, 'INCIDENT REPORT')
-    doc.add_paragraph(f"Case #: {form_data.get('case_number', '')}").alignment = WD_ALIGN_PARAGRAPH.CENTER
-    _kv(doc, [
-        ('Categories', ', '.join(inc.get('categories', [])) or '-'),
-        ('Date / Time', f"{inc.get('date', '-')} {inc.get('time', '')}"),
-        ('Location', inc.get('location', '-')),
-        ('Urgency', inc.get('urgency', '-')),
-    ])
+    facts = form_data.get('facts', {})
     parties = form_data.get('involved_parties', [])
-    if parties:
-        _heading(doc, 'Persons Involved')
-        table = doc.add_table(rows=1, cols=3)
+    prop = form_data.get('property_items', [])
+    notif = form_data.get('notifications', {})
+
+    # Header
+    _title(doc, officer.get("department_name") or "Smyrna Police Department")
+    _title(doc, "INCIDENT/INVESTIGATION REPORT")
+    p_case = doc.add_paragraph()
+    p_case.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_case.add_run(f"Case #: {form_data.get('case_number') or '-'}\n").bold = True
+    
+    # 1. Incident Details
+    _heading(doc, "1. Case Information")
+    reported_dt = f"{inc.get('reported_date') or inc.get('date', '')} {inc.get('reported_time') or inc.get('time', '')}".strip()
+    secure_dt = f"{inc.get('date', '')} {inc.get('time', '')}".strip()
+    _kv(doc, [
+        ('ORI', officer.get('ori') or 'GA 0330400'),
+        ('Date / Time Reported', reported_dt),
+        ('Location of Incident', inc.get('location', '-')),
+        ('Premise Type', inc.get('premise_type') or 'Hotel/motel/etc.'),
+        ('Last Known Secure', secure_dt)
+    ])
+
+    # 2. Crimes
+    _heading(doc, "2. Offense Details")
+    categories = inc.get("categories", []) or ["General Information / Incident"]
+    crime_rows = []
+    for idx, c_name in enumerate(categories):
+        weapon = notif.get("weapon_detail") if notif.get("weapon_involved") else "None"
+        crime_rows.append((f"Offense #{idx+1}", c_name))
+        crime_rows.append((f"  Weapon / Tools", weapon or "None"))
+    _kv(doc, crime_rows)
+
+    # 3. MO Block
+    _heading(doc, "3. MO (Modus Operandi)")
+    doc.add_paragraph(facts.get('how') or 'N/A')
+
+    # 4. Involved Parties (Victims and Others)
+    victims = [p for p in parties if p.get('role') == 'victim']
+    others = [p for p in parties if p.get('role') != 'victim']
+    
+    if victims:
+        _heading(doc, "4. Victim Information")
+        for idx, v in enumerate(victims):
+            dob_val = v.get('dob') or '-'
+            _kv(doc, [
+                (f"Victim V{idx+1} Name", v.get('full_name', '-')),
+                ("DOB", dob_val),
+                ("Race / Sex", f"{v.get('race') or 'U'} / {v.get('sex') or 'U'}"),
+                ("Resident Status", "Resident" if v.get('address') else "Non-Resident"),
+                ("Home Address", v.get('address') or '-'),
+                ("Contact Phone", v.get('phone') or '-'),
+                ("Email", v.get('email') or '-')
+            ])
+
+    if others:
+        _heading(doc, "5. Other Involved Parties")
+        for idx, o in enumerate(others):
+            role_code = "Suspect" if o.get('role') == 'suspect' or o.get('role') == 'alleged' else ("Witness" if o.get('role') == 'witness' else "Other Involved")
+            _kv(doc, [
+                (f"Party #{idx+1} ({role_code})", o.get('full_name', '-')),
+                ("DOB", o.get('dob') or '-'),
+                ("Race / Sex", f"{o.get('race') or 'U'} / {o.get('sex') or 'U'}"),
+                ("Resident Status", "Resident" if o.get('address') else "Non-Resident"),
+                ("Home Address", o.get('address') or '-'),
+                ("Contact Phone", o.get('phone') or '-')
+            ])
+
+    # 5. Property Items
+    prop_items = [p for p in prop if p.get('type') != 'vehicle']
+    if prop_items:
+        _heading(doc, "6. Property Items")
+        table = doc.add_table(rows=1, cols=4)
         table.style = 'Light List Accent 1'
         hdr = table.rows[0].cells
-        hdr[0].text, hdr[1].text, hdr[2].text = 'Role', 'Name', 'Contact'
-        for x in parties:
-            c = table.add_row().cells
-            c[0].text = x.get('role', '')
-            c[1].text = x.get('full_name', '')
-            c[2].text = x.get('phone') or x.get('email') or ''
-    _heading(doc, 'Narrative')
+        hdr[0].text, hdr[1].text, hdr[2].text, hdr[3].text = 'Status', 'Description', 'Value', 'Serial Number'
+        for p_item in prop_items:
+            cells = table.add_row().cells
+            cells[0].text = p_item.get('status', '')
+            cells[1].text = p_item.get('type', '')
+            cells[2].text = f"${p_item.get('value')}" if p_item.get('value') else "-"
+            cells[3].text = p_item.get('serial_or_tag', '-')
+
+    # 6. Confidentiality Banner
+    doc.add_paragraph("\n")
+    p_warn = doc.add_paragraph()
+    p_warn.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_warn = p_warn.add_run("THE INFORMATION BELOW IS CONFIDENTIAL - FOR USE BY AUTHORIZED PERSONNEL ONLY")
+    run_warn.bold = True
+    
+    # 7. Narrative
+    _heading(doc, "Reporting Officer Narrative")
     _narrative(doc, narrative)
+    
+    # 8. Signatures
     _signature(doc, officer)
 
 

@@ -1,7 +1,14 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import User
+from .models import User, Agency
+
+
+@admin.register(Agency)
+class AgencyAdmin(admin.ModelAdmin):
+    list_display = ('name', 'jurisdiction_type', 'state', 'county')
+    search_fields = ('name', 'state', 'county', 'ori')
+    list_filter = ('jurisdiction_type', 'state')
 
 
 @admin.register(User)
@@ -10,7 +17,7 @@ class UserAdmin(BaseUserAdmin):
 
     ordering = ('-created_at',)
     list_display = (
-        'email', 'role', 'department_name',
+        'email', 'role', 'agency', 'department_name',
         'email_verified', 'is_verified', 'is_staff', 'is_active',
     )
     list_filter = ('role', 'email_verified', 'is_verified', 'is_staff', 'is_active')
@@ -26,7 +33,7 @@ class UserAdmin(BaseUserAdmin):
         }),
         ('Officer profile', {
             'fields': (
-                'badge_number', 'department_name', 'department_address',
+                'agency', 'badge_number', 'department_name', 'department_address',
                 'department_state', 'ori', 'phone_number', 'rank', 'division',
             )
         }),

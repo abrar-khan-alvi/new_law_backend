@@ -191,12 +191,19 @@ OTP_RESEND_COOLDOWN_SECONDS = env.int('OTP_RESEND_COOLDOWN_SECONDS', default=60)
 from datetime import timedelta  # noqa: E402
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=365),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=3650),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+# ── Django Session/CSRF Cookie Expiry Hardening ─────────────────────
+# Prevent Django-based / admin sessions from expiring
+SESSION_COOKIE_AGE = 315360000  # 10 years in seconds
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+CSRF_COOKIE_AGE = 315360000  # 10 years in seconds
+
 
 # ── AI model ─────────────────────────────────────────────────────────
 # AI_MODE: 'mock' (default, no infra) | 'ollama' (local dev) | 'bedrock' (prod)

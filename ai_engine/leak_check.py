@@ -17,6 +17,7 @@ review. The narrative is never mutated here.
 import re
 
 # Capitalized tokens that are sentence connectors / structural — never "facts".
+# Includes common police terminology/systems to prevent false hallucination flags.
 _STOPWORDS = {
     'the', 'a', 'an', 'at', 'on', 'in', 'of', 'to', 'and', 'or', 'but', 'for',
     'with', 'as', 'by', 'from', 'into', 'upon', 'after', 'before', 'during',
@@ -26,6 +27,9 @@ _STOPWORDS = {
     'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
     'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
     'september', 'october', 'november', 'december',
+    # Law enforcement systems and common terminology:
+    'national', 'crime', 'information', 'center', 'ncic', 'gcic', 'bwc', 'cad', 'rms',
+    'safety', 'investigation', 'division',
 }
 
 # Abbreviation ⇄ full-word equivalences so "Main St" ~ "Main Street" isn't flagged.

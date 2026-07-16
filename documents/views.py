@@ -13,6 +13,7 @@ from ai_engine.leak_check import check_narrative
 from ai_engine.model_client import ModelClient
 from ai_engine.postprocess import clean_narrative
 from ai_engine.prompt_builder import PROMPT_BUILDERS
+from ai_engine.quality_review import check_constitutional_quality
 from subscriptions.models import UsageLog
 from utils.audit_log import (
     log_document_access,
@@ -48,6 +49,22 @@ def _officer_profile(user) -> dict:
         'phone': user.phone_number,
         'email': user.email,
     }
+    
+    if user.agency:
+        profile.update({
+            'agency_name': user.agency.name,
+            'agency_jurisdiction_type': user.agency.jurisdiction_type,
+            'agency_state': user.agency.state,
+            'agency_county': user.agency.county,
+            'agency_court_caption': user.agency.court_caption,
+            'agency_default_legal_citations': user.agency.default_legal_citations,
+        })
+        # Override legacy fields if agency is set
+        profile['department_name'] = user.agency.name
+        profile['department_state'] = user.agency.state
+        profile['ori'] = user.agency.ori
+        
+    return profile
 
 
 def _run_generation(doc, narrative_style, temperature=0.2):
@@ -66,6 +83,9 @@ def _run_generation(doc, narrative_style, temperature=0.2):
 
     # Deterministic post-generation leak/hallucination check (flags, never edits).
     doc.leak_flags = check_narrative(ai_text, doc.form_data, officer)
+
+    # Constitutional Quality Review
+    doc.quality_flags = check_constitutional_quality(doc.doc_type, ai_text)
 
     doc.ai_narrative = ai_text
     doc.status = GeneratedDocument.Status.COMPLETED

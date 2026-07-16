@@ -6,6 +6,45 @@ from django.utils import timezone
 from .managers import UserManager
 
 
+class Agency(models.Model):
+    """
+    Jurisdiction and configuration profile for an agency.
+    """
+    class JurisdictionType(models.TextChoices):
+        FEDERAL = 'federal', 'Federal'
+        STATE = 'state', 'State'
+        MUNICIPAL = 'municipal', 'Municipal/County'
+
+    name = models.CharField(max_length=255, unique=True)
+    jurisdiction_type = models.CharField(
+        max_length=50, choices=JurisdictionType.choices, default=JurisdictionType.STATE
+    )
+    state = models.CharField(max_length=100, blank=True)
+    county = models.CharField(max_length=100, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    court_name = models.CharField(max_length=255, blank=True)
+    judicial_district = models.CharField(max_length=255, blank=True)
+    division = models.CharField(max_length=100, blank=True)
+    court_caption = models.CharField(max_length=255, blank=True)
+    judge_title = models.CharField(max_length=100, blank=True)
+    prosecuting_authority = models.CharField(max_length=255, blank=True)
+    case_number_format = models.CharField(max_length=100, blank=True)
+    ori = models.CharField(max_length=50, blank=True)
+    default_legal_citations = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'agencies'
+        verbose_name_plural = 'Agencies'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+
 class User(AbstractUser):
     """
     Custom user model for law enforcement officers and platform admins.
@@ -30,6 +69,10 @@ class User(AbstractUser):
     )
 
     # ── Officer profile (auto-injected into generated documents) ─────────
+    agency = models.ForeignKey(
+        Agency, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='officers', help_text="The jurisdiction configuration for this user."
+    )
     badge_number = models.CharField(max_length=50, blank=True)
     department_name = models.CharField(max_length=200, blank=True)
     department_address = models.TextField(blank=True)

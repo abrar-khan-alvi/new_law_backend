@@ -74,13 +74,33 @@ def _sanitize_examples(text: str) -> str:
 
 
 def _officer_block(officer: dict) -> str:
+    agency_name = officer.get('agency_name') or officer.get('department_name', '')
     return (
         f"Officer: {officer.get('full_name', '')}\n"
         f"Rank/Title: {officer.get('rank', '')}\n"
         f"Badge: {officer.get('badge_number', '')}\n"
-        f"Department: {officer.get('department_name', '')}\n"
+        f"Department/Agency: {agency_name}\n"
         f"ORI: {officer.get('ori', '')}\n"
     )
+
+def _agency_context(officer: dict) -> str:
+    if not officer.get('agency_name'):
+        return ""
+        
+    jurisdiction = officer.get('agency_jurisdiction_type', 'state').capitalize()
+    state = officer.get('agency_state', 'Unknown State')
+    county = officer.get('agency_county', '')
+    default_citations = officer.get('agency_default_legal_citations', '')
+    
+    ctx = f"Agency Jurisdiction Type: {jurisdiction} ({state}"
+    if county:
+        ctx += f", {county} County"
+    ctx += ")\n"
+    
+    if default_citations:
+        ctx += f"Default Legal Citations to consider: {default_citations}\n"
+        
+    return f"\nJURISDICTION CONTEXT (Apply {jurisdiction} formatting rules):\n{ctx}"
 
 
 def _style_instruction(narrative_style: str) -> str:
@@ -185,6 +205,7 @@ def build_search_warrant_prompt(form_data, officer, narrative_style='first_perso
         f"{_style_instruction(narrative_style)}\n\n"
         "Affiant officer (context only — do NOT reproduce as a signature):\n"
         f"{_officer_block(officer)}\n"
+        f"{_agency_context(officer)}"
     )
 
     query = ' '.join(filter(None, [pc.get('investigation_summary', ''), offenses,
@@ -221,6 +242,7 @@ def build_arrest_warrant_prompt(form_data, officer, narrative_style='first_perso
         f"{_style_instruction(narrative_style)}\n\n"
         "Affiant officer (context only — do NOT reproduce as a signature):\n"
         f"{_officer_block(officer)}\n"
+        f"{_agency_context(officer)}"
     )
 
     query = ' '.join(filter(None, [offense.get('brief_description', ''), pc.get('facts', '')]))

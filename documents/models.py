@@ -51,6 +51,9 @@ class GeneratedDocument(models.Model):
     # review, e.g. [{"type": "proper_noun", "value": "DoorDash"}]. Empty = clean.
     leak_flags = models.JSONField(default=list, blank=True)
 
+    # Constitutional Quality Review flags (e.g. missing citations, missing nexus)
+    quality_flags = models.JSONField(default=list, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
