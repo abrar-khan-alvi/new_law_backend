@@ -1,7 +1,6 @@
 {
   "info": {
     "name": "Law Enforcement Workflow Automation System",
-    "description": "API Reference collection",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -24,13 +23,23 @@
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/auth/register/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "register", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"officer@dept.gov\",\n  \"password\": \"StrongPass123!\",\n  \"password2\": \"StrongPass123!\",\n  \"first_name\": \"Edward\",\n  \"last_name\": \"Brown\",\n  \"badge_number\": \"2911\",\n  \"department_name\": \"Life University Police Department\",\n  \"department_address\": \"1269 Barclay Cir SE, Marietta, GA\",\n  \"department_state\": \"GA\",\n  \"ori\": \"GA0331100\",\n  \"phone_number\": \"770-426-2911\",\n  \"rank\": \"Police Officer\",\n  \"division\": \"Patrol\"\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"email\": \"officer@dept.gov\",\n    \"password\": \"StrongPass123!\",\n    \"password2\": \"StrongPass123!\",\n    \"first_name\": \"Edward\",\n    \"last_name\": \"Brown\",\n    \"badge_number\": \"2911\",\n    \"department_name\": \"Life University Police Department\",\n    \"department_address\": \"1269 Barclay Cir SE, Marietta, GA\",\n    \"department_state\": \"GA\",\n    \"ori\": \"GA0331100\",\n    \"phone_number\": \"770-426-2911\",\n    \"rank\": \"Police Officer\",\n    \"division\": \"Patrol\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -40,13 +49,23 @@
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/auth/verify-email/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "verify-email", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "verify-email"
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"officer@dept.gov\",\n  \"code\": \"123456\"\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"email\": \"officer@dept.gov\",\n    \"code\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -56,18 +75,51 @@
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/auth/resend-verification/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "resend-verification", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "resend-verification"
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"officer@dept.gov\"\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"email\": \"officer@dept.gov\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
           "name": "Login",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/auth/login/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"officer@dept.gov\",\n    \"password\": \"StrongPass123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
           "event": [
             {
               "listen": "test",
@@ -80,20 +132,7 @@
                 "type": "text/javascript"
               }
             }
-          ],
-          "request": {
-            "method": "POST",
-            "url": {
-              "raw": "{{base_url}}/api/auth/login/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "login", ""]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"officer@dept.gov\",\n  \"password\": \"StrongPass123!\"\n}",
-              "options": {"raw": {"language": "json"}}
-            }
-          }
+          ]
         },
         {
           "name": "Token Refresh",
@@ -101,96 +140,159 @@
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/auth/token/refresh/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "token", "refresh", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "token",
+                "refresh"
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"refresh\": \"<refresh_token>\"\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"refresh\": \"<refresh_token>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
           "name": "Logout",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/auth/logout/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "logout", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"refresh\": \"<refresh_token>\"\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"refresh\": \"<refresh_token>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
           "name": "Profile",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/auth/profile/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "profile", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "profile"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
         {
           "name": "Update Profile",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "PATCH",
             "url": {
               "raw": "{{base_url}}/api/auth/profile/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "profile", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "profile"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"rank\": \"Sergeant\",\n  \"division\": \"Investigations\",\n  \"phone_number\": \"770-000-0000\"\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"rank\": \"Sergeant\",\n    \"division\": \"Investigations\",\n    \"phone_number\": \"770-000-0000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
           "name": "Change Password",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/auth/change-password/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "change-password", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "change-password"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"old_password\": \"StrongPass123!\",\n  \"new_password\": \"EvenStronger456!\"\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"old_password\": \"StrongPass123!\",\n    \"new_password\": \"EvenStronger456!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -200,13 +302,23 @@
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/auth/password-reset/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "password-reset", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "password-reset"
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"officer@dept.gov\"\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"email\": \"officer@dept.gov\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -216,47 +328,51 @@
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/auth/password-reset/confirm/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "password-reset", "confirm", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "password-reset",
+                "confirm"
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"officer@dept.gov\",\n  \"code\": \"123456\",\n  \"new_password\": \"NewPass789!\"\n}",
-              "options": {"raw": {"language": "json"}}
-            }
-          }
-        },
-        {
-          "name": "Verify Officer (Admin)",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
-            "method": "POST",
-            "url": {
-              "raw": "{{base_url}}/api/auth/verify-officer/:id/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "verify-officer", ":id", ""]
+              "raw": "{\n    \"email\": \"officer@dept.gov\",\n    \"code\": \"123456\",\n    \"new_password\": \"NewPass789!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
           "name": "List Users (Admin)",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/auth/users/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "auth", "users", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "users"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         }
@@ -268,139 +384,337 @@
         {
           "name": "Generate Document (IR)",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/documents/generate/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "documents", "generate", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "generate"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"doc_type\": \"incident_report\",\n  \"narrative_style\": \"third_person\",\n  \"form_data\": {\n    \"case_number\": null,\n    \"incident\": {\n      \"categories\": [\"Larceny\", \"General Information\"],\n      \"urgency\": \"normal\",\n      \"date\": \"2026-01-06\",\n      \"time\": \"19:30\",\n      \"location\": \"University Commons Room #1240-B\"\n    },\n    \"involved_parties\": [\n      { \"role\": \"complainant\", \"full_name\": \"Justin Kim\", \"id_number\": \"0281984\", \"phone\": \"267-752-0534\" },\n      { \"role\": \"alleged\", \"full_name\": \"Martrece Smith\", \"id_number\": \"0271959\" }\n    ],\n    \"property_items\": [{ \"type\": \"currency\", \"value\": 400, \"status\": \"missing\" }],\n    \"notifications\": { \"weapon_involved\": false, \"alcohol_drugs\": false, \"is_hazing\": false },\n    \"facts\": {\n      \"who\": \"Complainant Justin Kim; alleged party Martrece Smith (roommate)\",\n      \"what\": \"Report of $400 in currency missing from a wallet\",\n      \"when\": \"Between 1930 on 01/04 and 1930 on 01/06\",\n      \"where\": \"Dorm room NC1 1240B\",\n      \"how\": \"Wallet found under bed, cash missing, no other contents taken\",\n      \"officer_actions\": \"Took report at 1945; called Smith at 2001, left voicemail; Smith returned call 2010 and denied knowledge.\"\n    },\n    \"attachments\": []\n  }\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"doc_type\": \"incident_report\",\n    \"narrative_style\": \"third_person\",\n    \"form_data\": {\n        \"case_number\": null,\n        \"incident\": {\n            \"categories\": [\n                \"Larceny\",\n                \"General Information\"\n            ],\n            \"urgency\": \"normal\",\n            \"date\": \"2026-01-06\",\n            \"time\": \"19:30\",\n            \"location\": \"University Commons Room #1240-B\"\n        },\n        \"involved_parties\": [\n            {\n                \"role\": \"complainant\",\n                \"full_name\": \"Justin Kim\",\n                \"id_number\": \"0281984\",\n                \"phone\": \"267-752-0534\"\n            },\n            {\n                \"role\": \"alleged\",\n                \"full_name\": \"Martrece Smith\",\n                \"id_number\": \"0271959\"\n            }\n        ],\n        \"property_items\": [\n            {\n                \"type\": \"currency\",\n                \"value\": 400,\n                \"status\": \"missing\"\n            }\n        ],\n        \"notifications\": {\n            \"weapon_involved\": false,\n            \"alcohol_drugs\": false,\n            \"is_hazing\": false\n        },\n        \"facts\": {\n            \"who\": \"Complainant Justin Kim; alleged party Martrece Smith (roommate)\",\n            \"what\": \"Report of $400 in currency missing from a wallet\",\n            \"when\": \"Between 1930 on 01/04 and 1930 on 01/06\",\n            \"where\": \"Dorm room NC1 1240B\",\n            \"how\": \"Wallet found under bed, cash missing, no other contents taken\",\n            \"officer_actions\": \"Took report at 1945; called Smith at 2001, left voicemail; Smith returned call 2010 and denied knowledge.\"\n        },\n        \"attachments\": []\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
           "name": "Generate Document (Search Warrant)",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/documents/generate/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "documents", "generate", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "generate"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"doc_type\": \"search_warrant\",\n  \"narrative_style\": \"first_person\",\n  \"form_data\": {\n    \"case_number\": \"2:23-mj-281\",\n    \"court\": { \"district\": \"Central District of California\", \"judge_name\": \"Patricia Donahue\" },\n    \"offenses\": [{ \"code_section\": \"18 U.S.C. § 1030\", \"description\": \"Computer fraud\" }],\n    \"place_to_search\": { \"type\": \"server\", \"description\": \"Servers at the data center\", \"address\": \"Los Angeles, CA\" },\n    \"items_to_seize\": [\"All data and logs relating to the offense\"],\n    \"execution\": { \"execute_by_date\": \"2026-07-01\", \"time_window\": \"anytime\" },\n    \"probable_cause\": {\n      \"affiant_background\": \"FBI Special Agent, cybercrime since 2018.\",\n      \"investigation_summary\": \"Servers used to host the operation.\",\n      \"timeline\": [\"2026-06-01: forensic images obtained\"],\n      \"nexus_to_place\": \"Evidence physically resides on these servers.\"\n    }\n  }\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"doc_type\": \"search_warrant\",\n    \"narrative_style\": \"first_person\",\n    \"form_data\": {\n        \"case_number\": \"2:23-mj-281\",\n        \"court\": {\n            \"district\": \"Central District of California\",\n            \"judge_name\": \"Patricia Donahue\"\n        },\n        \"offenses\": [\n            {\n                \"code_section\": \"18 U.S.C. \\u00a7 1030\",\n                \"description\": \"Computer fraud\"\n            }\n        ],\n        \"place_to_search\": {\n            \"type\": \"server\",\n            \"description\": \"Servers at the data center\",\n            \"address\": \"Los Angeles, CA\"\n        },\n        \"items_to_seize\": [\n            \"All data and logs relating to the offense\"\n        ],\n        \"execution\": {\n            \"execute_by_date\": \"2026-07-01\",\n            \"time_window\": \"anytime\"\n        },\n        \"probable_cause\": {\n            \"affiant_background\": \"FBI Special Agent, cybercrime since 2018.\",\n            \"investigation_summary\": \"Servers used to host the operation.\",\n            \"timeline\": [\n                \"2026-06-01: forensic images obtained\"\n            ],\n            \"nexus_to_place\": \"Evidence physically resides on these servers.\"\n        }\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
           "name": "Generate Document (Arrest Warrant)",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/documents/generate/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "documents", "generate", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "generate"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"doc_type\": \"arrest_warrant\",\n  \"narrative_style\": \"third_person\",\n  \"form_data\": {\n    \"case_number\": null,\n    \"court\": { \"district\": \"Northern District of Georgia\" },\n    \"defendant\": { \"full_name\": \"John A. Doe\" },\n    \"charging_document\": \"complaint\",\n    \"offense\": { \"code_section\": \"18 U.S.C. § 2113(a)\", \"brief_description\": \"Bank robbery by force and violence\" },\n    \"identifiers\": {\n      \"aliases\": [\"Johnny D\"], \"date_of_birth\": \"1990-04-12\",\n      \"height\": \"5'11\\\"\", \"weight\": \"180 lbs\", \"sex\": \"M\", \"race\": \"White\",\n      \"last_known_residence\": \"123 Peachtree St, Atlanta, GA\",\n      \"vehicle_description\": \"Black 2018 Honda Civic, GA tag ABC1234\"\n    },\n    \"probable_cause\": {\n      \"include_affidavit\": true,\n      \"affiant_background\": \"Detective, Atlanta PD, 8 years.\",\n      \"facts\": \"Surveillance and eyewitness ID place the defendant at the scene.\",\n      \"timeline\": [\"2026-05-01: Robbery occurred\"]\n    }\n  }\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"doc_type\": \"arrest_warrant\",\n    \"narrative_style\": \"third_person\",\n    \"form_data\": {\n        \"case_number\": null,\n        \"court\": {\n            \"district\": \"Northern District of Georgia\"\n        },\n        \"defendant\": {\n            \"full_name\": \"John A. Doe\"\n        },\n        \"charging_document\": \"complaint\",\n        \"offense\": {\n            \"code_section\": \"18 U.S.C. \\u00a7 2113(a)\",\n            \"brief_description\": \"Bank robbery by force and violence\"\n        },\n        \"identifiers\": {\n            \"aliases\": [\n                \"Johnny D\"\n            ],\n            \"date_of_birth\": \"1990-04-12\",\n            \"height\": \"5'11\\\"\",\n            \"weight\": \"180 lbs\",\n            \"sex\": \"M\",\n            \"race\": \"White\",\n            \"last_known_residence\": \"123 Peachtree St, Atlanta, GA\",\n            \"vehicle_description\": \"Black 2018 Honda Civic, GA tag ABC1234\"\n        },\n        \"probable_cause\": {\n            \"include_affidavit\": true,\n            \"affiant_background\": \"Detective, Atlanta PD, 8 years.\",\n            \"facts\": \"Surveillance and eyewitness ID place the defendant at the scene.\",\n            \"timeline\": [\n                \"2026-05-01: Robbery occurred\"\n            ]\n        }\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
           "name": "List Documents",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/documents/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "documents", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
         {
           "name": "Get Document",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/documents/:pk/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "documents", ":pk", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                ":pk"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
         {
           "name": "Regenerate Document",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/documents/:pk/regenerate/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "documents", ":pk", "regenerate", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                ":pk",
+                "regenerate"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
         {
           "name": "Export Document",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/documents/:pk/export/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "documents", ":pk", "export", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                ":pk",
+                "export"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"format\": \"pdf\",\n  \"edited_text\": \"\"\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"format\": \"pdf\",\n    \"edited_text\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Supervisor Review",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/documents/:pk/supervisor-review/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                ":pk",
+                "supervisor-review"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"approved\": true,\n    \"notes\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Prosecutor Review",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/documents/:pk/prosecutor-review/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                ":pk",
+                "prosecutor-review"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"reviewer_name\": \"A.D.A. Jane Smith\",\n    \"approved\": true,\n    \"notes\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Sign Document",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/documents/:pk/sign/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                ":pk",
+                "sign"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"full_name\": \"Officer Edward Brown\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         }
@@ -412,34 +726,55 @@
         {
           "name": "List Training Docs",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/ai/training-docs/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "ai", "training-docs", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "ai",
+                "training-docs"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
         {
           "name": "Upload Training Doc",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/ai/training-docs/upload/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "ai", "training-docs", "upload", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "ai",
+                "training-docs",
+                "upload"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "formdata",
@@ -458,42 +793,104 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/subscriptions/plans/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "subscriptions", "plans", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "subscriptions",
+                "plans"
+              ]
             }
           }
         },
         {
           "name": "Subscription Status",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/subscriptions/status/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "subscriptions", "status", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "subscriptions",
+                "status"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Start Trial",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/subscriptions/start-trial/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "subscriptions",
+                "start-trial"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"plan\": \"pro\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
           "name": "Cancel Subscription",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/subscriptions/cancel/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "subscriptions", "cancel", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "subscriptions",
+                "cancel"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         }
@@ -505,22 +902,36 @@
         {
           "name": "Create Checkout Session",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/payments/create-checkout/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "payments", "create-checkout", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "create-checkout"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plan\": \"pro\",\n  \"billing_period\": \"monthly\"\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"plan\": \"pro\",\n    \"billing_period\": \"monthly\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -530,25 +941,41 @@
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/payments/webhook/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "payments", "webhook", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "webhook"
+              ]
             }
           }
         },
         {
           "name": "Billing History",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/payments/billing-history/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "payments", "billing-history", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "billing-history"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         }
@@ -560,185 +987,614 @@
         {
           "name": "Platform Stats",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/admin-panel/stats/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin-panel", "stats", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "stats"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
         {
           "name": "List Plans",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/admin-panel/plans/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin-panel", "plans", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "plans"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
         {
           "name": "Create Plan",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/admin-panel/plans/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin-panel", "plans", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "plans"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"pro\",\n  \"display_name\": \"Pro Plan\",\n  \"description\": \"Unlimited access\",\n  \"price_monthly\": \"59.00\",\n  \"price_yearly\": \"590.00\",\n  \"document_limit\": 9999,\n  \"can_incident_report\": true,\n  \"can_search_warrant\": true,\n  \"can_arrest_warrant\": true,\n  \"can_export_pdf\": true,\n  \"can_export_docx\": true,\n  \"can_save_history\": true,\n  \"can_regenerate\": true,\n  \"support_level\": \"priority\",\n  \"is_active\": true,\n  \"sort_order\": 2\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"name\": \"pro\",\n    \"display_name\": \"Pro Plan\",\n    \"description\": \"Unlimited access\",\n    \"price_monthly\": \"59.00\",\n    \"price_yearly\": \"590.00\",\n    \"document_limit\": null,\n    \"warrant_document_limit\": null,\n    \"can_incident_report\": true,\n    \"can_search_warrant\": true,\n    \"can_arrest_warrant\": true,\n    \"can_export_pdf\": true,\n    \"can_export_docx\": true,\n    \"can_save_history\": true,\n    \"support_level\": \"priority\",\n    \"is_active\": true,\n    \"sort_order\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
           "name": "Get Plan",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/admin-panel/plans/:pk/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin-panel", "plans", ":pk", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "plans",
+                ":pk"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
         {
           "name": "Update Plan",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "PATCH",
             "url": {
               "raw": "{{base_url}}/api/admin-panel/plans/:pk/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin-panel", "plans", ":pk", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "plans",
+                ":pk"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"price_monthly\": \"29.00\",\n  \"can_arrest_warrant\": true\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"price_monthly\": \"29.00\",\n    \"can_arrest_warrant\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
           "name": "Delete Plan",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "DELETE",
             "url": {
               "raw": "{{base_url}}/api/admin-panel/plans/:pk/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin-panel", "plans", ":pk", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "plans",
+                ":pk"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
         {
           "name": "List Users",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/admin-panel/users/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin-panel", "users", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "users"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
         {
           "name": "Update User",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "PATCH",
             "url": {
               "raw": "{{base_url}}/api/admin-panel/users/:pk/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin-panel", "users", ":pk", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "users",
+                ":pk"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"role\": \"officer\",\n  \"is_verified\": true\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"role\": \"officer\",\n    \"is_supervisor\": true,\n    \"agency\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
           "name": "List Documents",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/admin-panel/documents/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin-panel", "documents", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "documents"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
         {
-          "name": "Get Document (Admin)",
+          "name": "Get Document",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/admin-panel/documents/:pk/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin-panel", "documents", ":pk", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "documents",
+                ":pk"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Jurisdiction Profiles",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/admin-panel/jurisdiction-profiles/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "jurisdiction-profiles"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Jurisdiction Profile",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/admin-panel/jurisdiction-profiles/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "jurisdiction-profiles"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Georgia \\u2014 State\",\n    \"jurisdiction_type\": \"state\",\n    \"state\": \"GA\",\n    \"default_legal_citations\": \"O.C.G.A. \\u00a7 17-5-21\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update Jurisdiction Profile",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/api/admin-panel/jurisdiction-profiles/:pk/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "jurisdiction-profiles",
+                ":pk"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"default_legal_citations\": \"O.C.G.A. \\u00a7 17-5-21, as amended\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Jurisdiction Profile",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/api/admin-panel/jurisdiction-profiles/:pk/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "jurisdiction-profiles",
+                ":pk"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Agencies",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/admin-panel/agencies/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "agencies"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Agency",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/admin-panel/agencies/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "agencies"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Smyrna Police Department\",\n    \"jurisdiction_type\": \"municipal\",\n    \"state\": \"GA\",\n    \"county\": \"Cobb\",\n    \"city\": \"Smyrna\",\n    \"ori\": \"GA0330400\",\n    \"requires_supervisor_review\": true,\n    \"requires_prosecutor_review\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update Agency",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/api/admin-panel/agencies/:pk/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "agencies",
+                ":pk"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"requires_prosecutor_review\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Agency",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/api/admin-panel/agencies/:pk/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "agencies",
+                ":pk"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Upload Agency Seal",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/admin-panel/agencies/:pk/seal/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "agencies",
+                ":pk",
+                "seal"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Activity Log",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/admin-panel/activity/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin-panel",
+                "activity"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         }
@@ -753,30 +1609,50 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/blog/posts/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "blog", "posts", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "blog",
+                "posts"
+              ]
             }
           }
         },
         {
           "name": "Create Post",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/blog/posts/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "blog", "posts", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "blog",
+                "posts"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Welcome\",\n  \"content\": \"# Markdown body\",\n  \"excerpt\": \"Short summary\",\n  \"category\": \"news\",\n  \"tags\": [\"update\", \"release\"],\n  \"is_featured\": false,\n  \"publish\": true\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"title\": \"Welcome\",\n    \"content\": \"# Markdown body\",\n    \"excerpt\": \"Short summary\",\n    \"category\": \"news\",\n    \"tags\": [\n        \"update\",\n        \"release\"\n    ],\n    \"is_featured\": false,\n    \"publish\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -786,64 +1662,109 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/blog/posts/:slug/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "blog", "posts", ":slug", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "blog",
+                "posts",
+                ":slug"
+              ]
             }
           }
         },
         {
           "name": "Update Post",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "PATCH",
             "url": {
               "raw": "{{base_url}}/api/blog/posts/:slug/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "blog", "posts", ":slug", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "blog",
+                "posts",
+                ":slug"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"publish\": false\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"publish\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
           "name": "Delete Post",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "DELETE",
             "url": {
               "raw": "{{base_url}}/api/blog/posts/:slug/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "blog", "posts", ":slug", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "blog",
+                "posts",
+                ":slug"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
         {
           "name": "Upload Media",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/blog/posts/:slug/media/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "blog", "posts", ":slug", "media", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "blog",
+                "posts",
+                ":slug",
+                "media"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "formdata",
@@ -854,39 +1775,68 @@
         {
           "name": "Upload Media (Embed)",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "POST",
             "url": {
               "raw": "{{base_url}}/api/blog/posts/:slug/media/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "blog", "posts", ":slug", "media", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "blog",
+                "posts",
+                ":slug",
+                "media"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"media_type\": \"video_url\",\n  \"video_url\": \"https://youtube.com/watch?v=...\",\n  \"caption\": \"Demo video\"\n}",
-              "options": {"raw": {"language": "json"}}
+              "raw": "{\n    \"media_type\": \"video_url\",\n    \"video_url\": \"https://youtube.com/watch?v=...\",\n    \"caption\": \"Demo video\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
           "name": "Delete Media",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                { "key": "token", "value": "{{token}}", "type": "string" }
-              ]
-            },
             "method": "DELETE",
             "url": {
               "raw": "{{base_url}}/api/blog/posts/:slug/media/:media_id/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "blog", "posts", ":slug", "media", ":media_id", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "blog",
+                "posts",
+                ":slug",
+                "media",
+                ":media_id"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
@@ -896,8 +1846,14 @@
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/api/blog/tags/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "blog", "tags", ""]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "blog",
+                "tags"
+              ]
             }
           }
         }
@@ -909,8 +1865,12 @@
         "method": "GET",
         "url": {
           "raw": "{{base_url}}/health/",
-          "host": ["{{base_url}}"],
-          "path": ["health", ""]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "health"
+          ]
         }
       }
     }

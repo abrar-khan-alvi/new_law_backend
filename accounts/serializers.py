@@ -2,17 +2,42 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import User, Agency
+from .models import User, Agency, JurisdictionProfile
+
+
+class JurisdictionProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = JurisdictionProfile
+        fields = [
+            'id', 'name', 'jurisdiction_type', 'state', 'county',
+            'default_legal_citations',
+        ]
+
 
 class AgencySerializer(serializers.ModelSerializer):
+    jurisdiction_profile_name = serializers.CharField(
+        source='jurisdiction_profile.name', read_only=True, default=None,
+    )
+    seal_image_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Agency
         fields = [
-            'id', 'name', 'jurisdiction_type', 'state', 'county', 'city',
+            'id', 'name', 'jurisdiction_type', 'jurisdiction_profile', 'jurisdiction_profile_name',
+            'state', 'county', 'city',
             'court_name', 'judicial_district', 'division', 'court_caption',
             'judge_title', 'prosecuting_authority', 'case_number_format',
-            'ori', 'default_legal_citations'
+            'ori', 'default_legal_citations', 'seal_image_url',
+            'requires_supervisor_review', 'requires_prosecutor_review',
+            'created_at', 'updated_at',
         ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_seal_image_url(self, obj):
+        if not obj.seal_image_key:
+            return None
+        from utils.storage import media_url
+        return media_url(obj.seal_image_key)
 
 
 # ── Profile ──────────────────────────────────────────────────────────
@@ -21,7 +46,10 @@ class SubscriptionBriefSerializer(serializers.Serializer):
     plan_display = serializers.CharField(source='plan.display_name')
     status = serializers.CharField()
     documents_generated_this_month = serializers.IntegerField()
-    document_limit = serializers.IntegerField(source='plan.document_limit')
+    warrants_generated_this_month = serializers.IntegerField()
+    # null = unlimited for both limits below.
+    document_limit = serializers.IntegerField(source='plan.document_limit', allow_null=True)
+    warrant_document_limit = serializers.IntegerField(source='plan.warrant_document_limit', allow_null=True)
     current_period_end = serializers.DateTimeField()
 
 
@@ -36,11 +64,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'email', 'full_name', 'first_name', 'last_name',
             'role', 'agency', 'badge_number', 'department_name', 'department_address',
             'department_state', 'ori', 'phone_number', 'rank', 'division',
-            'email_verified', 'is_verified', 'subscription',
+            'email_verified', 'is_supervisor', 'subscription',
             'last_active', 'created_at',
         ]
         read_only_fields = [
-            'id', 'email', 'role', 'email_verified', 'is_verified', 'created_at',
+            'id', 'email', 'role', 'email_verified', 'is_supervisor', 'created_at',
         ]
 
 

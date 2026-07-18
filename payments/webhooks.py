@@ -17,12 +17,18 @@ logger = logging.getLogger(__name__)
 
 
 def _price_to_plan():
-    """Invert STRIPE_PRICES → {price_id: (plan_name, period)} (skip empties)."""
-    return {
-        price_id: (name, period)
-        for (name, period), price_id in settings.STRIPE_PRICES.items()
-        if price_id
-    }
+    """
+    {price_id: (plan_name, period)}, built from the Plan table itself — the
+    same source of truth CreateCheckoutSessionView reads from — rather than a
+    hardcoded settings dict that has to be kept in sync by hand.
+    """
+    mapping = {}
+    for plan in Plan.objects.filter(is_active=True):
+        if plan.stripe_price_id_monthly:
+            mapping[plan.stripe_price_id_monthly] = (plan.name, 'monthly')
+        if plan.stripe_price_id_yearly:
+            mapping[plan.stripe_price_id_yearly] = (plan.name, 'yearly')
+    return mapping
 
 
 def _ts(unix):
@@ -57,23 +63,45 @@ def _on_checkout_complete(session):
     user_id = (session.get('metadata') or {}).get('user_id')
     stripe_sub = stripe.Subscription.retrieve(session['subscription'])
     price_id = stripe_sub['items']['data'][0]['price']['id']
-    plan_name, period = _price_to_plan().get(price_id, ('basic', 'monthly'))
+    resolved = _price_to_plan().get(price_id)
+    if not resolved:
+        # Unrecognized price ID — no Plan row has this price ID configured.
+        # Fail loudly rather than silently guessing a plan the customer didn't
+        # pay for; an admin needs to set the right Plan.stripe_price_id_* field.
+        logger.error(
+            'Checkout complete with unrecognized Stripe price_id=%s (user_id=%s) — '
+            'no active Plan has this price ID set. Subscription NOT activated.',
+            price_id, user_id,
+        )
+        return
+    plan_name, period = resolved
 
     try:
         user = User.objects.get(pk=user_id)
-        sub = user.subscription
-        sub.plan = Plan.objects.get(name=plan_name)
-        sub.status = 'active'
-        sub.billing_period = period
-        sub.stripe_subscription_id = stripe_sub['id']
-        sub.stripe_customer_id = stripe_sub['customer']
-        sub.current_period_start = _ts(stripe_sub['current_period_start'])
-        sub.current_period_end = _ts(stripe_sub['current_period_end'])
-        sub.documents_generated_this_month = 0
-        sub.save()
-        logger.info('Subscription activated: %s → %s', user.email, plan_name)
+        plan = Plan.objects.get(name=plan_name)
     except User.DoesNotExist:
         logger.error('Checkout complete but user %s not found.', user_id)
+        return
+    except Plan.DoesNotExist:
+        logger.error(
+            'Checkout complete for plan "%s" (user %s) but that plan no longer exists.',
+            plan_name, user_id,
+        )
+        return
+
+    sub = user.subscription
+    sub.plan = plan
+    sub.status = 'active'
+    sub.billing_period = period
+    sub.stripe_subscription_id = stripe_sub['id']
+    sub.stripe_customer_id = stripe_sub['customer']
+    sub.current_period_start = _ts(stripe_sub['current_period_start'])
+    sub.current_period_end = _ts(stripe_sub['current_period_end'])
+    sub.documents_generated_this_month = 0
+    sub.warrants_generated_this_month = 0
+    sub.cancel_at_period_end = False
+    sub.save()
+    logger.info('Subscription activated: %s → %s', user.email, plan_name)
 
 
 def _on_subscription_updated(stripe_sub):
@@ -82,7 +110,10 @@ def _on_subscription_updated(stripe_sub):
         sub.status = stripe_sub['status']
         sub.current_period_start = _ts(stripe_sub['current_period_start'])
         sub.current_period_end = _ts(stripe_sub['current_period_end'])
-        sub.save(update_fields=['status', 'current_period_start', 'current_period_end'])
+        sub.cancel_at_period_end = bool(stripe_sub.get('cancel_at_period_end'))
+        sub.save(update_fields=[
+            'status', 'current_period_start', 'current_period_end', 'cancel_at_period_end',
+        ])
     except Subscription.DoesNotExist:
         pass
 
@@ -92,7 +123,11 @@ def _on_subscription_cancelled(stripe_sub):
         sub = Subscription.objects.get(stripe_subscription_id=stripe_sub['id'])
         sub.plan = Plan.objects.get(name='free')
         sub.status = 'cancelled'
-        sub.save(update_fields=['plan', 'status'])
+        sub.cancel_at_period_end = False
+        # Clear it — otherwise a future resubscribe attempt would try to
+        # modify this now-dead Stripe subscription instead of starting a new one.
+        sub.stripe_subscription_id = ''
+        sub.save(update_fields=['plan', 'status', 'cancel_at_period_end', 'stripe_subscription_id'])
         logger.info('Subscription cancelled: %s', sub.user.email)
     except (Subscription.DoesNotExist, Plan.DoesNotExist):
         pass

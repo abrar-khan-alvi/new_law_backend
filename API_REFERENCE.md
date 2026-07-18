@@ -96,7 +96,7 @@ Blacklists the refresh token.
   "badge_number": "2911", "department_name": "Life University Police Department",
   "department_address": "...", "department_state": "GA", "ori": "GA0331100",
   "phone_number": "770-426-2911", "rank": "Police Officer", "division": "Patrol",
-  "email_verified": true, "is_verified": false,
+  "email_verified": true, "is_supervisor": false,
   "subscription": {
     "plan": "free", "plan_display": "Free", "status": "active",
     "documents_generated_this_month": 0, "document_limit": 3,
@@ -124,10 +124,6 @@ Confirm with the **numeric OTP code** emailed by `/password-reset/`.
 **Request:** `{ "email": "officer@dept.gov", "code": "123456", "new_password": "NewPass789!" }`
 **Response `200`:** `{ "message": "Password has been reset. You can now log in." }`
 **Errors `400`:** `{ "error": "Invalid code." }` / `Code expired...`
-
-### POST `/api/auth/verify-officer/<pk>/` — 🔒 admin
-Vets an officer account (`is_verified=true`).
-**Response `200`:** `{ "message": "officer@dept.gov has been verified." }`
 
 ### GET `/api/auth/users/` — 🔒 admin
 List all users (array of profile objects).
@@ -381,13 +377,14 @@ Paginated. Filters: `?q=<email substring>`, `?role=officer`.
 ```json
 { "count": 42, "next": null, "previous": null,
   "results": [ { "id": 5, "email": "...", "full_name": "...", "role": "officer", "department_name": "...",
-                 "is_active": true, "is_verified": false, "email_verified": true, "plan": "free",
+                 "is_active": true, "is_supervisor": false, "email_verified": true, "plan": "free",
+                 "agency": 3, "agency_name": "Smyrna Police Department",
                  "last_active": "...", "created_at": "..." } ] }
 ```
 
 ### PATCH `/api/admin-panel/users/<pk>/` — 🔒 admin
-Activate/deactivate, set role, verify.
-**Request (any subset):** `{ "is_active": false }` or `{ "role": "officer", "is_verified": true }`
+Activate/deactivate, set role, plan, agency, supervisor capability.
+**Request (any subset):** `{ "is_active": false }` or `{ "role": "officer" }` or `{ "agency": 3 }` or `{ "is_supervisor": true }`
 **Response `200`:** the updated admin-user object.
 
 ### GET `/api/admin-panel/documents/` — 🔒 admin

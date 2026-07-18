@@ -5,18 +5,30 @@ from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import User
+from accounts.models import Agency, JurisdictionProfile, User
 from accounts.permissions import IsAdmin
+from accounts.serializers import AgencySerializer, JurisdictionProfileSerializer
 from documents.models import GeneratedDocument
 from documents.serializers import GeneratedDocumentSerializer
 from subscriptions.models import Plan, Subscription
 from subscriptions.serializers import PlanSerializer
+from utils.audit_log import log_event
 from utils.pagination import StandardPagination
+from utils.validators import (
+    ALLOWED_IMAGE_EXTENSIONS,
+    EXT_TO_MIME,
+    MAX_IMAGE_SIZE,
+    validate_file_extension,
+    validate_file_signature,
+    validate_file_size,
+)
 
+from .models import AuditLog
 from .serializers import (
     AdminDocumentSerializer,
     AdminUserSerializer,
     AdminUserUpdateSerializer,
+    AuditLogSerializer,
 )
 
 
@@ -32,7 +44,6 @@ class PlatformStatsView(APIView):
             'users': {
                 'total': User.objects.count(),
                 'officers': User.objects.filter(role='officer').count(),
-                'verified': User.objects.filter(is_verified=True).count(),
                 'new_7d': User.objects.filter(created_at__gte=last_7d).count(),
             },
             'documents': {
@@ -61,7 +72,8 @@ class PlanManagementView(APIView):
     def post(self, request):
         serializer = PlanSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        plan = serializer.save()
+        log_event(request.user, 'admin.plan.create', name=plan.name)
         return Response(serializer.data, status=201)
 
 
@@ -85,6 +97,7 @@ class PlanDetailView(APIView):
         serializer = PlanSerializer(plan, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        log_event(request.user, 'admin.plan.update', name=plan.name)
         return Response(serializer.data)
 
     def delete(self, request, pk):
@@ -96,7 +109,9 @@ class PlanDetailView(APIView):
                 {'error': {'detail': 'Cannot delete a plan with active subscriptions.'}},
                 status=400,
             )
+        plan_name = plan.name
         plan.delete()
+        log_event(request.user, 'admin.plan.delete', severity='warning', name=plan_name)
         return Response(status=204)
 
 
@@ -119,7 +134,8 @@ class DocumentManagementView(APIView):
         if status_f:
             qs = qs.filter(status=status_f)
         if str(request.GET.get('flagged', '')).lower() in ('true', '1'):
-            qs = qs.exclude(leak_flags=[])
+            from django.db.models import Q
+            qs = qs.exclude(Q(leak_flags=[]) & Q(quality_flags=[]))
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
         return paginator.get_paginated_response(AdminDocumentSerializer(page, many=True).data)
@@ -155,8 +171,8 @@ class UserManagementView(APIView):
 
 class UserDetailView(APIView):
     """
-    PATCH /api/admin-panel/users/<pk>/ — activate/deactivate, set role, verify.
-    Body example: {"is_active": false} or {"role": "officer", "is_verified": true}
+    PATCH /api/admin-panel/users/<pk>/ — activate/deactivate, set role, plan, agency.
+    Body example: {"is_active": false} or {"role": "officer"} or {"agency": 3}
     """
     permission_classes = [IsAdmin]
 
@@ -183,9 +199,176 @@ class UserDetailView(APIView):
 
         serializer = AdminUserUpdateSerializer(user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        # Stamp verification metadata when newly verifying.
-        if serializer.validated_data.get('is_verified') and not user.is_verified:
-            user.verified_at = timezone.now()
-            user.verified_by = request.user
+        changed = {k: v for k, v in serializer.validated_data.items()}
+        if new_plan_name:
+            changed['plan'] = new_plan_name
         serializer.save()
+        if changed:
+            log_event(request.user, 'admin.user.update', target=user.email, **changed)
         return Response(AdminUserSerializer(user).data)
+
+
+class JurisdictionProfileListCreateView(APIView):
+    """
+    GET / POST /api/admin-panel/jurisdiction-profiles/ — shared state/federal
+    defaults. Adding a new state or federal district is creating one of these,
+    not writing new code (requirement #6, future scalability).
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        return Response(
+            JurisdictionProfileSerializer(JurisdictionProfile.objects.all(), many=True).data
+        )
+
+    def post(self, request):
+        serializer = JurisdictionProfileSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        profile = serializer.save()
+        log_event(request.user, 'admin.jurisdiction_profile.create', name=profile.name)
+        return Response(serializer.data, status=201)
+
+
+class JurisdictionProfileDetailView(APIView):
+    """GET / PATCH / DELETE /api/admin-panel/jurisdiction-profiles/<pk>/"""
+    permission_classes = [IsAdmin]
+
+    def _get(self, pk):
+        return JurisdictionProfile.objects.filter(pk=pk).first()
+
+    def get(self, request, pk):
+        profile = self._get(pk)
+        if not profile:
+            return Response({'error': {'detail': 'Jurisdiction profile not found.'}}, status=404)
+        return Response(JurisdictionProfileSerializer(profile).data)
+
+    def patch(self, request, pk):
+        profile = self._get(pk)
+        if not profile:
+            return Response({'error': {'detail': 'Jurisdiction profile not found.'}}, status=404)
+        serializer = JurisdictionProfileSerializer(profile, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        log_event(request.user, 'admin.jurisdiction_profile.update', name=profile.name)
+        return Response(serializer.data)
+
+    def delete(self, request, pk):
+        profile = self._get(pk)
+        if not profile:
+            return Response({'error': {'detail': 'Jurisdiction profile not found.'}}, status=404)
+        if profile.agencies.exists():
+            return Response(
+                {'error': {'detail': 'Cannot delete a jurisdiction profile with agencies attached.'}},
+                status=400,
+            )
+        profile_name = profile.name
+        profile.delete()
+        log_event(request.user, 'admin.jurisdiction_profile.delete', severity='warning', name=profile_name)
+        return Response(status=204)
+
+
+class AgencyListCreateView(APIView):
+    """
+    GET / POST /api/admin-panel/agencies/ — agency/jurisdiction configuration.
+    Admin-only: this data (court caption, judge title, prosecuting authority,
+    citations) becomes printed legal text on warrants and is shared across every
+    officer assigned to the agency, so it isn't self-service.
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        qs = Agency.objects.select_related('jurisdiction_profile').all()
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(qs, request)
+        return paginator.get_paginated_response(AgencySerializer(page, many=True).data)
+
+    def post(self, request):
+        serializer = AgencySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        agency = serializer.save()
+        log_event(request.user, 'admin.agency.create', name=agency.name)
+        return Response(serializer.data, status=201)
+
+
+class AgencyDetailView(APIView):
+    """GET / PATCH / DELETE /api/admin-panel/agencies/<pk>/"""
+    permission_classes = [IsAdmin]
+
+    def _get(self, pk):
+        return Agency.objects.filter(pk=pk).first()
+
+    def get(self, request, pk):
+        agency = self._get(pk)
+        if not agency:
+            return Response({'error': {'detail': 'Agency not found.'}}, status=404)
+        return Response(AgencySerializer(agency).data)
+
+    def patch(self, request, pk):
+        agency = self._get(pk)
+        if not agency:
+            return Response({'error': {'detail': 'Agency not found.'}}, status=404)
+        serializer = AgencySerializer(agency, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        log_event(request.user, 'admin.agency.update', name=agency.name)
+        return Response(serializer.data)
+
+    def delete(self, request, pk):
+        agency = self._get(pk)
+        if not agency:
+            return Response({'error': {'detail': 'Agency not found.'}}, status=404)
+        if agency.officers.exists():
+            return Response(
+                {'error': {'detail': 'Cannot delete an agency with officers assigned.'}},
+                status=400,
+            )
+        agency_name = agency.name
+        agency.delete()
+        log_event(request.user, 'admin.agency.delete', severity='warning', name=agency_name)
+        return Response(status=204)
+
+
+class AgencySealUploadView(APIView):
+    """POST /api/admin-panel/agencies/<pk>/seal/ — upload the agency seal/logo image."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        agency = Agency.objects.filter(pk=pk).first()
+        if not agency:
+            return Response({'error': {'detail': 'Agency not found.'}}, status=404)
+
+        file_obj = request.FILES.get('seal')
+        if not file_obj:
+            return Response({'error': {'detail': 'No "seal" file provided.'}}, status=400)
+
+        try:
+            validate_file_size(file_obj, MAX_IMAGE_SIZE)
+            ext = validate_file_extension(file_obj, ALLOWED_IMAGE_EXTENSIONS)
+            validate_file_signature(file_obj, EXT_TO_MIME[ext])
+        except Exception as e:  # noqa: BLE001 — ValidationError, message already user-facing
+            return Response({'error': {'detail': str(e)}}, status=400)
+
+        from utils.storage import store_upload
+        key = f'agency_seals/{agency.id}{ext}'
+        store_upload(file_obj, key, content_type=file_obj.content_type)
+        agency.seal_image_key = key
+        agency.save(update_fields=['seal_image_key'])
+        log_event(request.user, 'admin.agency.seal_upload', name=agency.name)
+        return Response(AgencySerializer(agency).data)
+
+
+class ActivityLogView(APIView):
+    """
+    GET /api/admin-panel/activity/ — paginated audit trail feed backing the
+    Activity Monitor. Optional ?severity=info|warning filter.
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        qs = AuditLog.objects.select_related('user').all()
+        severity = request.GET.get('severity')
+        if severity:
+            qs = qs.filter(severity=severity)
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(qs, request)
+        return paginator.get_paginated_response(AuditLogSerializer(page, many=True).data)

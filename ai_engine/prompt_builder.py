@@ -188,6 +188,12 @@ def build_incident_report_prompt(form_data, officer, narrative_style='first_pers
 
 
 # ── Search warrant ───────────────────────────────────────────────────
+# NOTE: search/arrest warrants use a rules-based template for the legal
+# sections (see documents/templates_engine.py) — the AI's job here is narrowed
+# to organizing the officer's facts into ONE factual investigation narrative.
+# It never drafts the legal-conclusion sentences (nexus/elements/citations);
+# those are fixed, pre-approved text with placeholders filled directly from
+# form_data, assembled in documents/views.py::_run_generation.
 def build_search_warrant_prompt(form_data, officer, narrative_style='first_person'):
     pc = form_data.get('probable_cause', {})
     offenses = ', '.join(
@@ -197,10 +203,15 @@ def build_search_warrant_prompt(form_data, officer, narrative_style='first_perso
     place = form_data.get('place_to_search', {})
 
     header = (
-        "You are assisting a law enforcement officer in drafting the AFFIDAVIT "
-        "(statement of probable cause) for a search warrant. Be precise and "
-        "factual, and establish a clear nexus between the offenses and the place "
-        "to be searched.\n\n"
+        "You are assisting a law enforcement officer with a search warrant "
+        "affidavit. Your ONLY job is to write the INVESTIGATION NARRATIVE — a "
+        "clear, chronological, factual account of the investigation (who did "
+        "what, when, where, and how it was learned). Organize the officer's "
+        "facts into readable prose; do NOT invent legal language. Do NOT state "
+        "a probable-cause conclusion, do NOT argue the nexus to the place to be "
+        "searched, and do NOT cite statutes or write a closing paragraph — a "
+        "fixed, pre-approved legal section is appended automatically after "
+        "your narrative and already covers that.\n\n"
         f"{_OUTPUT_RULES}"
         f"{_style_instruction(narrative_style)}\n\n"
         "Affiant officer (context only — do NOT reproduce as a signature):\n"
@@ -213,19 +224,25 @@ def build_search_warrant_prompt(form_data, officer, narrative_style='first_perso
     style = _style_reference(query, 'search_warrant')
 
     facts_block = (
-        "\n=== FACTS (the ONLY source of truth for this affidavit) ===\n"
+        "\n=== FACTS (the ONLY source of truth for this narrative) ===\n"
         f"- Offenses: {offenses}\n"
         f"- Place to search: {place.get('description', '')} — {place.get('address', '')}\n"
         f"- Affiant background: {pc.get('affiant_background', '')}\n"
         f"- Investigation summary: {pc.get('investigation_summary', '')}\n"
         f"- Timeline: {'; '.join(pc.get('timeline', []))}\n"
-        f"- Nexus to place: {pc.get('nexus_to_place', '')}\n"
         f"- Prior warrants: {pc.get('prior_warrants', '') or 'none'}\n"
         "=== END FACTS ===\n"
+        "(Note: the nexus-to-place reasoning is handled by the fixed closing "
+        "section, not by you — do not restate it here.)\n"
     )
 
+    if not (pc.get('investigation_summary') or pc.get('affiant_background') or pc.get('timeline')):
+        # No narrative facts supplied — nothing for the AI to organize;
+        # _run_generation will skip the AI call and use the template alone.
+        return ''
+
     return header + style + facts_block + _ANTI_LEAK + (
-        "\nWrite the statement of probable cause now:"
+        "\nWrite ONLY the investigation narrative now (no conclusion, no citations):"
     )
 
 
@@ -235,9 +252,14 @@ def build_arrest_warrant_prompt(form_data, officer, narrative_style='first_perso
     pc = form_data.get('probable_cause', {})
 
     header = (
-        "You are assisting a law enforcement officer with an arrest warrant. "
-        "Draft a concise, formal offense description and, if facts are provided, "
-        "a short supporting probable-cause statement.\n\n"
+        "You are assisting a law enforcement officer with an arrest warrant "
+        "affidavit. Your ONLY job is to write the INVESTIGATION NARRATIVE — a "
+        "clear, chronological, factual account of the investigation supporting "
+        "the arrest. Organize the officer's facts into readable prose; do NOT "
+        "invent legal language. Do NOT state a probable-cause conclusion, do "
+        "NOT recite the elements of the offense, and do NOT cite statutes — a "
+        "fixed, pre-approved legal section is appended automatically after "
+        "your narrative and already covers that.\n\n"
         f"{_OUTPUT_RULES}"
         f"{_style_instruction(narrative_style)}\n\n"
         "Affiant officer (context only — do NOT reproduce as a signature):\n"
@@ -249,7 +271,7 @@ def build_arrest_warrant_prompt(form_data, officer, narrative_style='first_perso
     style = _style_reference(query, 'arrest_warrant')
 
     facts_block = (
-        "\n=== FACTS (the ONLY source of truth for this warrant) ===\n"
+        "\n=== FACTS (the ONLY source of truth for this narrative) ===\n"
         f"- Defendant: {form_data.get('defendant', {}).get('full_name', '')}\n"
         f"- Offense: {offense.get('code_section', '')} — {offense.get('brief_description', '')}\n"
         f"- Facts: {pc.get('facts', '') or '(none)'}\n"
@@ -257,8 +279,13 @@ def build_arrest_warrant_prompt(form_data, officer, narrative_style='first_perso
         "=== END FACTS ===\n"
     )
 
+    if not (pc.get('facts') or pc.get('timeline')):
+        # No narrative facts supplied at all — nothing for the AI to organize;
+        # _run_generation will skip the AI call and use the template alone.
+        return ''
+
     return header + style + facts_block + _ANTI_LEAK + (
-        "\nWrite the offense description (and probable-cause statement if applicable) now:"
+        "\nWrite ONLY the investigation narrative now (no conclusion, no citations):"
     )
 
 

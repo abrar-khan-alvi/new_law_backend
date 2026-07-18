@@ -43,19 +43,51 @@ def _kv_table(rows):
     return t
 
 
+def _seal_flowable(officer):
+    """Fetch and embed the agency seal image; never fail generation over it."""
+    key = officer.get('agency_seal_key')
+    if not key:
+        return None
+    try:
+        from reportlab.platypus import Image
+
+        from utils.storage import get_upload_bytes
+        data = get_upload_bytes(key)
+        if not data:
+            return None
+        img = Image(io.BytesIO(data), width=0.75 * inch, height=0.75 * inch)
+        img.hAlign = 'CENTER'
+        return img
+    except Exception:  # noqa: BLE001 — cosmetic only, never block document generation
+        return None
+
+
 def _header(officer):
     if officer.get('agency_name'):
         state = officer.get('agency_state') or '_______________________'
         county = officer.get('agency_county') or '_____________________'
-        court = officer.get('agency_court_caption') or '__________________ COURT'
+        court = officer.get('agency_court_caption') or officer.get('agency_court_name') or '__________________ COURT'
         agency = officer.get('agency_name') or '_______________________'
-        
-        flow = [
-            _p(f"STATE OF: {state.upper()}", ParagraphStyle('hj1', parent=_BODY, alignment=TA_CENTER)),
-            _p(f"COUNTY OF: {county.upper()}", ParagraphStyle('hj2', parent=_BODY, alignment=TA_CENTER)),
-            _p(f"IN THE {court.upper()}", ParagraphStyle('hj3', parent=_BODY, alignment=TA_CENTER)),
-            _p(f"AGENCY: {agency.upper()}", ParagraphStyle('hj5', parent=_BODY, alignment=TA_CENTER)),
-            Spacer(1, 16)
+        district = officer.get('agency_judicial_district')
+        division = officer.get('agency_division')
+
+        centered = ParagraphStyle('hjc', parent=_BODY, alignment=TA_CENTER)
+        flow = []
+        seal = _seal_flowable(officer)
+        if seal:
+            flow += [seal, Spacer(1, 4)]
+        flow += [
+            _p(f"STATE OF: {state.upper()}", centered),
+            _p(f"COUNTY OF: {county.upper()}", centered),
+            _p(f"IN THE {court.upper()}", centered),
+        ]
+        if district:
+            flow.append(_p(f"JUDICIAL DISTRICT: {district.upper()}", centered))
+        if division:
+            flow.append(_p(f"DIVISION: {division.upper()}", centered))
+        flow += [
+            _p(f"AGENCY: {agency.upper()}", centered),
+            Spacer(1, 16),
         ]
         return flow
     else:
@@ -69,7 +101,39 @@ def _header(officer):
         return flow
 
 
-def _sig_block(officer):
+_BANNER_LABELS = {
+    'pending_supervisor': 'DRAFT — PENDING SUPERVISOR REVIEW',
+    'pending_prosecutor': 'DRAFT — PENDING PROSECUTOR REVIEW',
+    'rejected': 'DRAFT — REVIEW REJECTED, NOT APPROVED FOR FILING',
+}
+
+
+def _draft_banner(doc_meta):
+    """"Generate a clean draft for supervisor or prosecutor review before
+    judicial submission" — a visible banner while review is outstanding."""
+    if not doc_meta:
+        return []
+    label = _BANNER_LABELS.get(doc_meta.get('review_status'))
+    if not label:
+        return []
+    banner_style = ParagraphStyle(
+        'draft', parent=_BODY, alignment=TA_CENTER, textColor=colors.red, fontName='Helvetica-Bold',
+    )
+    return [_p(label, banner_style), Spacer(1, 10)]
+
+
+def _sig_block(officer, doc_meta=None):
+    doc_meta = doc_meta or {}
+    signature_name = doc_meta.get('signature_name')
+    signed_at = doc_meta.get('signed_at')
+    if signature_name and signed_at:
+        return [
+            Spacer(1, 24),
+            _p(f"/s/ {signature_name}"),
+            _p(f"{officer.get('full_name', '')}, {officer.get('rank', '')}"),
+            _p(f"Badge: {officer.get('badge_number', '')}  ORI: {officer.get('ori', '')}", _SMALL),
+            _p(f"Electronically signed on {signed_at}", _SMALL),
+        ]
     return [
         Spacer(1, 24),
         _p('_______________________________'),
@@ -120,12 +184,12 @@ def _incident(form_data, narrative, officer):
     
     header_data = [
         [
-            _c("Agency Name", officer.get("department_name") or "Smyrna Police Department"),
+            _c("Agency Name", officer.get("department_name") or "(department not set)"),
             Paragraph("<font size=11><b>INCIDENT/INVESTIGATION<br/>REPORT</b></font>", ParagraphStyle('hc', parent=_TITLE, leading=12)),
             _c("Case#", case_no)
         ],
         [
-            _c("ORI", officer.get("ori") or "GA 0330400"),
+            _c("ORI", officer.get("ori") or "(ORI not set)"),
             "",
             _c("Date / Time Reported", reported_dt)
         ],
@@ -339,9 +403,9 @@ def _incident(form_data, narrative, officer):
     # 7. Responding Officers & Case Info
     footer_data = [
         [
-            _c("Officer / ID#", f"{officer.get('full_name') or 'TOSO, J. E.'} ({officer.get('badge_number') or '60457'})"),
-            _c("Invest ID# / Name", f"{officer.get('badge_number') or '24298'} - {officer.get('full_name') or '-'}" ),
-            _c("Supervisor", "STEPHENS, T. (24605)")
+            _c("Officer / ID#", f"{officer.get('full_name') or '-'} ({officer.get('badge_number') or '(badge not set)'})"),
+            _c("Invest ID# / Name", f"{officer.get('badge_number') or '(badge not set)'} - {officer.get('full_name') or '-'}"),
+            _c("Supervisor", "_______________________________")
         ],
         [
             _c("Case Status", "Closed By Investigation"),
@@ -433,13 +497,14 @@ def _incident(form_data, narrative, officer):
 
 
 # ── Search warrant ───────────────────────────────────────────────────
-def _search_warrant(form_data, narrative, officer):
+def _search_warrant(form_data, narrative, officer, doc_meta=None):
     court = form_data.get('court', {})
     place = form_data.get('place_to_search', {})
     offenses = form_data.get('offenses', [])
     items = form_data.get('items_to_seize', [])
 
     story = _header(officer)
+    story += _draft_banner(doc_meta)
     story += [_p('SEARCH AND SEIZURE WARRANT', _TITLE), Spacer(1, 6)]
     story.append(_kv_table([
         ('District', court.get('district', '-')),
@@ -457,18 +522,19 @@ def _search_warrant(form_data, narrative, officer):
     story += [_p(f"{chr(97 + i)}. {it}") for i, it in enumerate(items)] or [_p('-')]
 
     story += [_p('Affidavit — Statement of Probable Cause', _H)] + _narrative_paragraphs(narrative)
-    story += _sig_block(officer)
+    story += _sig_block(officer, doc_meta)
     return story
 
 
 # ── Arrest warrant ───────────────────────────────────────────────────
-def _arrest_warrant(form_data, narrative, officer):
+def _arrest_warrant(form_data, narrative, officer, doc_meta=None):
     court = form_data.get('court', {})
     defendant = form_data.get('defendant', {})
     offense = form_data.get('offense', {})
     ident = form_data.get('identifiers', {})
 
     story = _header(officer)
+    story += _draft_banner(doc_meta)
     story += [_p('ARREST WARRANT', _TITLE), Spacer(1, 6)]
     story.append(_kv_table([
         ('District', court.get('district', '-')),
@@ -490,7 +556,7 @@ def _arrest_warrant(form_data, narrative, officer):
 
     if narrative:
         story += [_p('Supporting Affidavit', _H)] + _narrative_paragraphs(narrative)
-    story += _sig_block(officer)
+    story += _sig_block(officer, doc_meta)
     return story
 
 
@@ -501,7 +567,7 @@ _BUILDERS = {
 }
 
 
-def render_sw_attachments(form_data, narrative, officer) -> bytes:
+def render_sw_attachments(form_data, narrative, officer, doc_meta=None) -> bytes:
     """Attachment A (place), Attachment B (items), and the Affidavit — the pages
     that accompany the official AO 93 face form."""
     place = form_data.get('place_to_search', {})
@@ -518,7 +584,7 @@ def render_sw_attachments(form_data, narrative, officer) -> bytes:
     story += [
         PageBreak(),
         _p('AFFIDAVIT — Statement of Probable Cause', _TITLE), Spacer(1, 8),
-    ] + _narrative_paragraphs(narrative) + _sig_block(officer)
+    ] + _narrative_paragraphs(narrative) + _sig_block(officer, doc_meta)
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -530,7 +596,7 @@ def render_sw_attachments(form_data, narrative, officer) -> bytes:
     return buf.getvalue()
 
 
-def render_simple_pdf(title, narrative, officer) -> bytes:
+def render_simple_pdf(title, narrative, officer, doc_meta=None) -> bytes:
     """A standalone titled narrative document (e.g. a supporting affidavit)."""
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -540,19 +606,29 @@ def render_simple_pdf(title, narrative, officer) -> bytes:
     )
     story = _header(officer) + [_p(title, _TITLE), Spacer(1, 8)]
     story += _narrative_paragraphs(narrative)
-    story += _sig_block(officer)
+    story += _sig_block(officer, doc_meta)
     doc.build(story)
     return buf.getvalue()
 
 
-def render_pdf(doc_type, form_data, narrative, officer) -> bytes:
-    # Court forms use the official templates (filled / overlaid), not redrawn.
-    if doc_type == 'arrest_warrant':
-        from .ao_forms import fill_arrest_warrant
-        return fill_arrest_warrant(form_data, narrative, officer)
-    if doc_type == 'search_warrant':
-        from .ao_forms import fill_search_warrant
-        return fill_search_warrant(form_data, narrative, officer)
+def render_pdf(doc_type, form_data, narrative, officer, doc_meta=None) -> bytes:
+    # The official AO-93/AO-442 federal forms are, by definition, FEDERAL forms —
+    # only use them for a federal jurisdiction. A state/municipal agency gets the
+    # custom, agency-aware builder below (STATE OF / COUNTY OF / COURT / AGENCY
+    # header), never the federal face form (requirement: automatic formatting by
+    # jurisdiction level).
+    jurisdiction = (
+        form_data.get('court', {}).get('jurisdiction_type_override')
+        or officer.get('agency_jurisdiction_type')
+        or 'state'
+    )
+    if jurisdiction == 'federal':
+        if doc_type == 'arrest_warrant':
+            from .ao_forms import fill_arrest_warrant
+            return fill_arrest_warrant(form_data, narrative, officer, doc_meta)
+        if doc_type == 'search_warrant':
+            from .ao_forms import fill_search_warrant
+            return fill_search_warrant(form_data, narrative, officer, doc_meta)
 
     builder = _BUILDERS.get(doc_type)
     if builder is None:
@@ -566,5 +642,8 @@ def render_pdf(doc_type, form_data, narrative, officer) -> bytes:
         leftMargin=margin, rightMargin=margin,
         topMargin=margin, bottomMargin=margin,
     )
-    doc.build(builder(form_data, narrative, officer))
+    if doc_type == 'incident_report':
+        doc.build(builder(form_data, narrative, officer))
+    else:
+        doc.build(builder(form_data, narrative, officer, doc_meta))
     return buf.getvalue()

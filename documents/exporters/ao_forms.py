@@ -72,7 +72,7 @@ def _text_map(form_data):
     }
 
 
-def fill_arrest_warrant(form_data, narrative, officer) -> bytes:
+def fill_arrest_warrant(form_data, narrative, officer, doc_meta=None) -> bytes:
     text_map = _text_map(form_data)
     charge_state = CHARGING_ON_STATE.get(form_data.get('charging_document', ''))
 
@@ -92,7 +92,7 @@ def fill_arrest_warrant(form_data, narrative, officer) -> bytes:
     # Append a supporting affidavit (extra pages) when a narrative is supplied.
     if narrative and narrative.strip():
         from .pdf import render_simple_pdf
-        aff_bytes = render_simple_pdf('SUPPORTING AFFIDAVIT', narrative, officer)
+        aff_bytes = render_simple_pdf('SUPPORTING AFFIDAVIT', narrative, officer, doc_meta)
         aff = fitz.open(stream=aff_bytes, filetype='pdf')
         doc.insert_pdf(aff)
         aff.close()
@@ -102,7 +102,7 @@ def fill_arrest_warrant(form_data, narrative, officer) -> bytes:
     return out.getvalue()
 
 
-def fill_search_warrant(form_data, narrative, officer) -> bytes:
+def fill_search_warrant(form_data, narrative, officer, doc_meta=None) -> bytes:
     """
     Overlay the official (flat) AO 93 face form by anchor position, then append
     Attachment A / Attachment B / Affidavit pages.
@@ -143,7 +143,7 @@ def fill_search_warrant(form_data, narrative, officer) -> bytes:
 
     # Append Attachment A / B / Affidavit pages.
     from .pdf import render_sw_attachments
-    extra = render_sw_attachments(form_data, narrative, officer)
+    extra = render_sw_attachments(form_data, narrative, officer, doc_meta)
     ex = fitz.open(stream=extra, filetype='pdf')
     doc.insert_pdf(ex)
     ex.close()

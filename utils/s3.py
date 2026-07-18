@@ -56,6 +56,12 @@ def generate_presigned_url(s3_key: str, expires_in: int = 3600) -> str:
     )
 
 
+def download_bytes_from_s3(s3_key: str) -> bytes:
+    buf = io.BytesIO()
+    _s3().download_fileobj(settings.AWS_S3_BUCKET, s3_key, buf)
+    return buf.getvalue()
+
+
 def delete_file_from_s3(s3_key: str) -> bool:
     try:
         _s3().delete_object(Bucket=settings.AWS_S3_BUCKET, Key=s3_key)

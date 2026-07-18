@@ -9,9 +9,10 @@ class PlanSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'display_name', 'description',
             'price_monthly', 'price_yearly',
-            'document_limit', 'can_incident_report', 'can_search_warrant',
+            'document_limit', 'warrant_document_limit',
+            'can_incident_report', 'can_search_warrant',
             'can_arrest_warrant', 'can_export_pdf', 'can_export_docx',
-            'can_save_history', 'can_regenerate', 'support_level',
+            'can_save_history', 'support_level',
             'is_active', 'sort_order',
         ]
 
@@ -23,7 +24,9 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         model = Subscription
         fields = [
             'id', 'plan', 'status', 'billing_period',
-            'current_period_start', 'current_period_end',
-            'documents_generated_this_month', 'usage_reset_date',
+            'current_period_start', 'current_period_end', 'trial_end',
+            'cancel_at_period_end', 'has_used_trial',
+            'documents_generated_this_month', 'warrants_generated_this_month',
+            'usage_reset_date',
             'created_at',
         ]

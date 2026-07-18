@@ -127,7 +127,6 @@ class Command(BaseCommand):
             email=EMAIL, defaults={'role': 'officer', 'first_name': 'Edward', 'last_name': 'Brown'})
         user.role = 'officer'
         user.email_verified = True
-        user.is_verified = True
         user.first_name = 'Edward'
         user.last_name = 'Brown'
         user.rank = 'Police Officer'

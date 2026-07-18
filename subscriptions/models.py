@@ -19,14 +19,24 @@ class Plan(models.Model):
     stripe_price_id_yearly = models.CharField(max_length=100, blank=True)
 
     # ── Features / limits ───────────────────────────────────────────────
-    document_limit = models.IntegerField(default=5)             # per month
+    # Incident reports per month. NULL means unlimited (not a magic-number sentinel).
+    document_limit = models.PositiveIntegerField(
+        null=True, blank=True, default=5,
+        help_text='Incident reports per month. Leave blank for unlimited.',
+    )
+    # Search + arrest warrants per month, combined. NULL means unlimited — the
+    # policy is that warrant generation is never hard-capped on a paying plan,
+    # since a missed court deadline is a far worse failure than extra AI cost.
+    warrant_document_limit = models.PositiveIntegerField(
+        null=True, blank=True, default=None,
+        help_text='Search + arrest warrants per month, combined. Leave blank for unlimited.',
+    )
     can_incident_report = models.BooleanField(default=True)
     can_search_warrant = models.BooleanField(default=False)
     can_arrest_warrant = models.BooleanField(default=False)
     can_export_pdf = models.BooleanField(default=True)
     can_export_docx = models.BooleanField(default=False)
     can_save_history = models.BooleanField(default=False)
-    can_regenerate = models.BooleanField(default=False)
     support_level = models.CharField(max_length=50, default='community')  # community/email/priority
 
     is_active = models.BooleanField(default=True)
@@ -89,9 +99,20 @@ class Subscription(models.Model):
     current_period_end = models.DateTimeField(null=True, blank=True)
     trial_end = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    # True once the user has clicked Cancel — subscription stays active/usable
+    # through current_period_end, then the Stripe webhook downgrades to free.
+    cancel_at_period_end = models.BooleanField(default=False)
+    # One free trial per account, ever — prevents trial-cycling by re-signup abuse
+    # (a new User always gets a fresh Subscription row, so this can't be reset).
+    has_used_trial = models.BooleanField(default=False)
 
     # ── Usage (reset monthly) ───────────────────────────────────────────
-    documents_generated_this_month = models.IntegerField(default=0)
+    # Separate counters: incident reports and warrants have independent
+    # quotas (Plan.document_limit vs Plan.warrant_document_limit), so they
+    # can't share one counter without one doc type silently eating the
+    # other's allowance.
+    documents_generated_this_month = models.IntegerField(default=0)  # incident reports
+    warrants_generated_this_month = models.IntegerField(default=0)   # search + arrest, combined
     usage_reset_date = models.DateField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -106,8 +127,43 @@ class Subscription(models.Model):
     def reset_monthly_usage(self):
         """Called by the Celery beat task on the 1st of each month (Phase 5)."""
         self.documents_generated_this_month = 0
+        self.warrants_generated_this_month = 0
         self.usage_reset_date = timezone.now().date()
-        self.save(update_fields=['documents_generated_this_month', 'usage_reset_date'])
+        self.save(update_fields=[
+            'documents_generated_this_month', 'warrants_generated_this_month', 'usage_reset_date',
+        ])
+
+    def _quota_field_for(self, doc_type: str):
+        """(counter_field_name, limit) for the quota bucket a doc_type draws from."""
+        if doc_type == 'incident_report':
+            return 'documents_generated_this_month', self.plan.document_limit
+        return 'warrants_generated_this_month', self.plan.warrant_document_limit
+
+    def try_reserve_quota(self, doc_type: str) -> bool:
+        """
+        Atomically increments the counter for this doc_type's quota bucket only
+        if still under that bucket's limit — a single conditional UPDATE, so
+        two concurrent requests can't both slip through a plain read-then-write
+        check (TOCTOU). Returns whether a slot was reserved; call
+        release_quota(doc_type) if the generation that follows fails, so a
+        failed attempt doesn't cost the user their quota. A limit of None
+        means unlimited — always reserves without a WHERE condition.
+        """
+        counter_field, limit = self._quota_field_for(doc_type)
+        qs = Subscription.objects.filter(pk=self.pk)
+        if limit is not None:
+            qs = qs.filter(**{f'{counter_field}__lt': limit})
+        updated = qs.update(**{counter_field: models.F(counter_field) + 1})
+        if updated:
+            self.refresh_from_db(fields=[counter_field])
+        return bool(updated)
+
+    def release_quota(self, doc_type: str):
+        """Undo a reservation from try_reserve_quota() after a failed generation."""
+        counter_field, _ = self._quota_field_for(doc_type)
+        Subscription.objects.filter(pk=self.pk).update(
+            **{counter_field: models.F(counter_field) - 1})
+        self.refresh_from_db(fields=[counter_field])
 
 
 class UsageLog(models.Model):

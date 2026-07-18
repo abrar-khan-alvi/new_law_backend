@@ -4,13 +4,21 @@ from .models import GeneratedDocument
 
 
 class GeneratedDocumentSerializer(serializers.ModelSerializer):
+    supervisor_reviewed_by_email = serializers.CharField(
+        source='supervisor_reviewed_by.email', read_only=True, default=None,
+    )
+
     class Meta:
         model = GeneratedDocument
         fields = [
-            'id', 'doc_type', 'case_number', 'form_data', 'ai_narrative',
+            'id', 'doc_type', 'case_number', 'form_data', 'ai_narrative', 'narrative_body',
             'narrative_style', 'status', 'error_message',
             'model_used', 'tokens_used', 'generation_time_ms',
-            'leak_flags',
+            'leak_flags', 'quality_flags',
+            'review_status', 'supervisor_reviewed_by_email', 'supervisor_reviewed_at',
+            'supervisor_notes', 'prosecutor_reviewed_name', 'prosecutor_reviewed_at',
+            'prosecutor_approved', 'prosecutor_notes',
+            'signature_name', 'signed_at',
             'created_at', 'updated_at',
         ]
         read_only_fields = fields

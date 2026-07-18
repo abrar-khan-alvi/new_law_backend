@@ -233,14 +233,14 @@ AWS_S3_BUCKET_REGION = env('AWS_S3_BUCKET_REGION', default=AWS_REGION)
 STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
 STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='')
 STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET', default='')
-STRIPE_PRICES = {
-    ('basic', 'monthly'): env('STRIPE_PRICE_BASIC_MONTHLY', default=''),
-    ('basic', 'yearly'): env('STRIPE_PRICE_BASIC_YEARLY', default=''),
-    ('pro', 'monthly'): env('STRIPE_PRICE_PRO_MONTHLY', default=''),
-    ('pro', 'yearly'): env('STRIPE_PRICE_PRO_YEARLY', default=''),
-    ('enterprise', 'monthly'): env('STRIPE_PRICE_ENTERPRISE_MONTHLY', default=''),
-    ('enterprise', 'yearly'): env('STRIPE_PRICE_ENTERPRISE_YEARLY', default=''),
-}
+# NOTE: Stripe price IDs are NOT configured here. They live on the Plan model
+# itself (Plan.stripe_price_id_monthly/yearly), admin-editable via the admin
+# panel with no redeploy needed — that's the actual source of truth checkout
+# and the webhook handler read from. A prior version of this settings file had
+# a separate hardcoded {(plan, period): price_id} dict that had to be kept in
+# sync with the Plan table by hand and drifted out of sync; that indirection
+# is gone. `manage.py seed_plans` reads the STRIPE_PRICE_* env vars below only
+# once, at initial bootstrap, to populate the Plan rows' price-ID fields.
 # Live checkout/webhook only run when a key is present.
 PAYMENTS_ENABLED = bool(STRIPE_SECRET_KEY)
 
@@ -275,6 +275,10 @@ CELERY_BEAT_SCHEDULE = {
     'reset-monthly-usage': {
         'task': 'subscriptions.tasks.reset_monthly_usage',
         'schedule': crontab(day_of_month=1, hour=0, minute=0),
+    },
+    'expire-trials': {
+        'task': 'subscriptions.tasks.expire_trials',
+        'schedule': crontab(hour=1, minute=0),  # daily at 01:00
     },
     'cleanup-failed-documents': {
         'task': 'documents.tasks.cleanup_failed_documents',

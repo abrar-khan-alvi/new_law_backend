@@ -89,7 +89,6 @@ auth_items = [
     create_request("Change Password", "POST", "/api/auth/change-password/", {"old_password": "StrongPass123!", "new_password": "EvenStronger456!"}, auth=True),
     create_request("Password Reset Request", "POST", "/api/auth/password-reset/", {"email": "officer@dept.gov"}),
     create_request("Password Reset Confirm", "POST", "/api/auth/password-reset/confirm/", {"email": "officer@dept.gov", "code": "123456", "new_password": "NewPass789!"}),
-    create_request("Verify Officer (Admin)", "POST", "/api/auth/verify-officer/:id/", auth=True),
     create_request("List Users (Admin)", "GET", "/api/auth/users/", auth=True)
 ]
 collection["item"].append(create_folder("1. Authentication", auth_items))
@@ -168,7 +167,10 @@ doc_items = [
     create_request("List Documents", "GET", "/api/documents/", auth=True),
     create_request("Get Document", "GET", "/api/documents/:pk/", auth=True),
     create_request("Regenerate Document", "POST", "/api/documents/:pk/regenerate/", auth=True),
-    create_request("Export Document", "POST", "/api/documents/:pk/export/", {"format": "pdf", "edited_text": ""}, auth=True)
+    create_request("Export Document", "POST", "/api/documents/:pk/export/", {"format": "pdf", "edited_text": ""}, auth=True),
+    create_request("Supervisor Review", "POST", "/api/documents/:pk/supervisor-review/", {"approved": True, "notes": ""}, auth=True),
+    create_request("Prosecutor Review", "POST", "/api/documents/:pk/prosecutor-review/", {"reviewer_name": "A.D.A. Jane Smith", "approved": True, "notes": ""}, auth=True),
+    create_request("Sign Document", "POST", "/api/documents/:pk/sign/", {"full_name": "Officer Edward Brown"}, auth=True)
 ]
 collection["item"].append(create_folder("2. Documents", doc_items))
 
@@ -183,6 +185,7 @@ collection["item"].append(create_folder("3. AI Engine", ai_items))
 sub_items = [
     create_request("List Plans", "GET", "/api/subscriptions/plans/"),
     create_request("Subscription Status", "GET", "/api/subscriptions/status/", auth=True),
+    create_request("Start Trial", "POST", "/api/subscriptions/start-trial/", {"plan": "pro"}, auth=True),
     create_request("Cancel Subscription", "POST", "/api/subscriptions/cancel/", auth=True)
 ]
 collection["item"].append(create_folder("4. Subscriptions", sub_items))
@@ -205,14 +208,14 @@ admin_items = [
         "description": "Unlimited access",
         "price_monthly": "59.00",
         "price_yearly": "590.00",
-        "document_limit": 9999,
+        "document_limit": None,
+        "warrant_document_limit": None,
         "can_incident_report": True,
         "can_search_warrant": True,
         "can_arrest_warrant": True,
         "can_export_pdf": True,
         "can_export_docx": True,
         "can_save_history": True,
-        "can_regenerate": True,
         "support_level": "priority",
         "is_active": True,
         "sort_order": 2
@@ -221,9 +224,26 @@ admin_items = [
     create_request("Update Plan", "PATCH", "/api/admin-panel/plans/:pk/", {"price_monthly": "29.00", "can_arrest_warrant": True}, auth=True),
     create_request("Delete Plan", "DELETE", "/api/admin-panel/plans/:pk/", auth=True),
     create_request("List Users", "GET", "/api/admin-panel/users/", auth=True),
-    create_request("Update User", "PATCH", "/api/admin-panel/users/:pk/", {"role": "officer", "is_verified": True}, auth=True),
+    create_request("Update User", "PATCH", "/api/admin-panel/users/:pk/", {"role": "officer", "is_supervisor": True, "agency": 3}, auth=True),
     create_request("List Documents", "GET", "/api/admin-panel/documents/", auth=True),
-    create_request("Get Document", "GET", "/api/admin-panel/documents/:pk/", auth=True)
+    create_request("Get Document", "GET", "/api/admin-panel/documents/:pk/", auth=True),
+    create_request("List Jurisdiction Profiles", "GET", "/api/admin-panel/jurisdiction-profiles/", auth=True),
+    create_request("Create Jurisdiction Profile", "POST", "/api/admin-panel/jurisdiction-profiles/", {
+        "name": "Georgia — State", "jurisdiction_type": "state", "state": "GA",
+        "default_legal_citations": "O.C.G.A. § 17-5-21"
+    }, auth=True),
+    create_request("Update Jurisdiction Profile", "PATCH", "/api/admin-panel/jurisdiction-profiles/:pk/", {"default_legal_citations": "O.C.G.A. § 17-5-21, as amended"}, auth=True),
+    create_request("Delete Jurisdiction Profile", "DELETE", "/api/admin-panel/jurisdiction-profiles/:pk/", auth=True),
+    create_request("List Agencies", "GET", "/api/admin-panel/agencies/", auth=True),
+    create_request("Create Agency", "POST", "/api/admin-panel/agencies/", {
+        "name": "Smyrna Police Department", "jurisdiction_type": "municipal",
+        "state": "GA", "county": "Cobb", "city": "Smyrna", "ori": "GA0330400",
+        "requires_supervisor_review": True, "requires_prosecutor_review": False
+    }, auth=True),
+    create_request("Update Agency", "PATCH", "/api/admin-panel/agencies/:pk/", {"requires_prosecutor_review": True}, auth=True),
+    create_request("Delete Agency", "DELETE", "/api/admin-panel/agencies/:pk/", auth=True),
+    create_request("Upload Agency Seal", "POST", "/api/admin-panel/agencies/:pk/seal/", auth=True),
+    create_request("Activity Log", "GET", "/api/admin-panel/activity/", auth=True)
 ]
 collection["item"].append(create_folder("6. Admin Panel", admin_items))
 
@@ -256,6 +276,10 @@ collection["item"].append(create_folder("7. Blog", blog_items))
 # 8. Health
 collection["item"].append(create_request("Health Check", "GET", "/health/"))
 
-with open(r"c:\Users\Abrar Khan\Downloads\law_backend\law_backend_postman_collection.json", "w", encoding="utf-8") as f:
+import os
+
+_OUTPUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "law_backend_postman_collection.json")
+
+with open(_OUTPUT_PATH, "w", encoding="utf-8") as f:
     json.dump(collection, f, indent=2)
-print("Done")
+print(f"Wrote {_OUTPUT_PATH}")

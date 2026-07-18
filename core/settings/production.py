@@ -1,7 +1,19 @@
 """Production settings — HTTPS, security hardening, real services."""
+from django.core.exceptions import ImproperlyConfigured
+
 from .base import *  # noqa: F401,F403
+from .base import SECRET_KEY
 
 DEBUG = False
+
+# Fail fast rather than silently signing sessions/JWTs — and the OTP HMAC
+# (accounts/otp.py) — with a publicly-known key because DJANGO_SECRET_KEY was
+# never set for this deploy.
+if not SECRET_KEY or SECRET_KEY == 'dev-insecure-change-me':
+    raise ImproperlyConfigured(
+        'DJANGO_SECRET_KEY must be set to a real, unique secret in production — '
+        'refusing to start with the insecure development default.'
+    )
 
 # ── HTTPS / security ─────────────────────────────────────────────────
 SECURE_SSL_REDIRECT = True

@@ -33,7 +33,51 @@ def _narrative(doc, narrative):
         doc.add_paragraph(b)
 
 
+def _add_seal(doc, officer):
+    """Embed the agency seal image; never fail export over it."""
+    key = officer.get('agency_seal_key')
+    if not key:
+        return
+    try:
+        from utils.storage import get_upload_bytes
+        data = get_upload_bytes(key)
+        if not data:
+            return
+        import io as _io
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.add_run().add_picture(_io.BytesIO(data), width=Pt(54))
+    except Exception:  # noqa: BLE001 — cosmetic only, never block export
+        pass
+
+
 def _header(doc, officer):
+    if officer.get('agency_name'):
+        # Dynamic jurisdiction header (STATE OF / COUNTY OF / COURT / AGENCY) —
+        # DOCX has no "official form" constraint, so every jurisdiction level
+        # gets this, not just federal.
+        _add_seal(doc, officer)
+        state = officer.get('agency_state') or '_______________________'
+        county = officer.get('agency_county') or '_____________________'
+        court = officer.get('agency_court_caption') or officer.get('agency_court_name') or '__________________ COURT'
+        agency = officer.get('agency_name') or '_______________________'
+        district = officer.get('agency_judicial_district')
+        division = officer.get('agency_division')
+
+        for line in [f"STATE OF: {state.upper()}", f"COUNTY OF: {county.upper()}", f"IN THE {court.upper()}"]:
+            p = doc.add_paragraph(line)
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        if district:
+            p = doc.add_paragraph(f"JUDICIAL DISTRICT: {district.upper()}")
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        if division:
+            p = doc.add_paragraph(f"DIVISION: {division.upper()}")
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p = doc.add_paragraph(f"AGENCY: {agency.upper()}")
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        doc.add_paragraph()
+        return
+
     _title(doc, officer.get('department_name') or 'Law Enforcement Agency')
     bits = [officer.get('department_address'), officer.get('department_state')]
     sub = ' · '.join(b for b in bits if b)
@@ -42,8 +86,38 @@ def _header(doc, officer):
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
 
-def _signature(doc, officer):
+_BANNER_LABELS = {
+    'pending_supervisor': 'DRAFT — PENDING SUPERVISOR REVIEW',
+    'pending_prosecutor': 'DRAFT — PENDING PROSECUTOR REVIEW',
+    'rejected': 'DRAFT — REVIEW REJECTED, NOT APPROVED FOR FILING',
+}
+
+
+def _draft_banner(doc, doc_meta):
+    if not doc_meta:
+        return
+    label = _BANNER_LABELS.get(doc_meta.get('review_status'))
+    if not label:
+        return
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run(label)
+    run.bold = True
+    from docx.shared import RGBColor
+    run.font.color.rgb = RGBColor(0xCC, 0x00, 0x00)
+
+
+def _signature(doc, officer, doc_meta=None):
+    doc_meta = doc_meta or {}
+    signature_name = doc_meta.get('signature_name')
+    signed_at = doc_meta.get('signed_at')
     doc.add_paragraph('\n')
+    if signature_name and signed_at:
+        doc.add_paragraph(f"/s/ {signature_name}")
+        doc.add_paragraph(f"{officer.get('full_name', '')}, {officer.get('rank', '')}")
+        doc.add_paragraph(f"Badge: {officer.get('badge_number', '')}  ORI: {officer.get('ori', '')}")
+        doc.add_paragraph(f"Electronically signed on {signed_at}")
+        return
     doc.add_paragraph('_______________________________')
     doc.add_paragraph(f"{officer.get('full_name', '')}, {officer.get('rank', '')}")
     doc.add_paragraph(f"Badge: {officer.get('badge_number', '')}  ORI: {officer.get('ori', '')}")
@@ -58,18 +132,18 @@ def _incident(doc, form_data, narrative, officer):
     notif = form_data.get('notifications', {})
 
     # Header
-    _title(doc, officer.get("department_name") or "Smyrna Police Department")
+    _title(doc, officer.get("department_name") or "(department not set)")
     _title(doc, "INCIDENT/INVESTIGATION REPORT")
     p_case = doc.add_paragraph()
     p_case.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_case.add_run(f"Case #: {form_data.get('case_number') or '-'}\n").bold = True
-    
+
     # 1. Incident Details
     _heading(doc, "1. Case Information")
     reported_dt = f"{inc.get('reported_date') or inc.get('date', '')} {inc.get('reported_time') or inc.get('time', '')}".strip()
     secure_dt = f"{inc.get('date', '')} {inc.get('time', '')}".strip()
     _kv(doc, [
-        ('ORI', officer.get('ori') or 'GA 0330400'),
+        ('ORI', officer.get('ori') or '(ORI not set)'),
         ('Date / Time Reported', reported_dt),
         ('Location of Incident', inc.get('location', '-')),
         ('Premise Type', inc.get('premise_type') or 'Hotel/motel/etc.'),
@@ -152,10 +226,11 @@ def _incident(doc, form_data, narrative, officer):
 
 
 # ── Search warrant ───────────────────────────────────────────────────
-def _search_warrant(doc, form_data, narrative, officer):
+def _search_warrant(doc, form_data, narrative, officer, doc_meta=None):
     court = form_data.get('court', {})
     place = form_data.get('place_to_search', {})
     _header(doc, officer)
+    _draft_banner(doc, doc_meta)
     _title(doc, 'SEARCH AND SEIZURE WARRANT')
     _kv(doc, [
         ('District', court.get('district', '-')),
@@ -173,16 +248,17 @@ def _search_warrant(doc, form_data, narrative, officer):
         doc.add_paragraph(f"{chr(97 + i)}. {it}")
     _heading(doc, 'Affidavit — Statement of Probable Cause')
     _narrative(doc, narrative)
-    _signature(doc, officer)
+    _signature(doc, officer, doc_meta)
 
 
 # ── Arrest warrant ───────────────────────────────────────────────────
-def _arrest_warrant(doc, form_data, narrative, officer):
+def _arrest_warrant(doc, form_data, narrative, officer, doc_meta=None):
     court = form_data.get('court', {})
     defendant = form_data.get('defendant', {})
     offense = form_data.get('offense', {})
     ident = form_data.get('identifiers', {})
     _header(doc, officer)
+    _draft_banner(doc, doc_meta)
     _title(doc, 'ARREST WARRANT')
     _kv(doc, [
         ('District', court.get('district', '-')),
@@ -203,7 +279,7 @@ def _arrest_warrant(doc, form_data, narrative, officer):
     if narrative:
         _heading(doc, 'Supporting Affidavit')
         _narrative(doc, narrative)
-    _signature(doc, officer)
+    _signature(doc, officer, doc_meta)
 
 
 _BUILDERS = {
@@ -213,12 +289,15 @@ _BUILDERS = {
 }
 
 
-def render_docx(doc_type, form_data, narrative, officer) -> io.BytesIO:
+def render_docx(doc_type, form_data, narrative, officer, doc_meta=None) -> io.BytesIO:
     builder = _BUILDERS.get(doc_type)
     if builder is None:
         raise ValueError(f'No DOCX template for doc_type {doc_type}')
     doc = Document()
-    builder(doc, form_data, narrative, officer)
+    if doc_type == 'incident_report':
+        builder(doc, form_data, narrative, officer)
+    else:
+        builder(doc, form_data, narrative, officer, doc_meta)
     buf = io.BytesIO()
     doc.save(buf)
     buf.seek(0)

@@ -387,13 +387,6 @@ class User(AbstractUser):
     rank              = models.CharField(max_length=100, blank=True)
     division          = models.CharField(max_length=100, blank=True)
 
-    # Verification
-    is_verified       = models.BooleanField(default=False)
-    verified_at       = models.DateTimeField(null=True, blank=True)
-    verified_by       = models.ForeignKey('self', on_delete=models.SET_NULL,
-                                           null=True, blank=True,
-                                           related_name='verified_users')
-
     # Timestamps
     last_active       = models.DateTimeField(null=True, blank=True)
     created_at        = models.DateTimeField(auto_now_add=True)
@@ -544,18 +537,6 @@ class IsAdmin(BasePermission):
         )
 
 
-class IsVerifiedOfficer(BasePermission):
-    """Officers who have been verified by an admin."""
-    message = 'Your account is pending verification.'
-
-    def has_permission(self, request, view):
-        return (
-            request.user.is_authenticated and
-            request.user.role in ['officer', 'admin'] and
-            request.user.is_verified
-        )
-
-
 class HasActiveSubscription(BasePermission):
     """User must have an active paid subscription."""
     message = 'An active subscription is required to access this feature.'
@@ -649,28 +630,6 @@ class ProfileView(APIView):
         return Response(serializer.errors, status=400)
 
 
-class VerifyOfficerView(APIView):
-    """
-    POST /api/auth/verify/{user_id}/
-    Admin endpoint to verify a law enforcement officer account.
-    """
-    from accounts.permissions import IsAdmin
-    permission_classes = [IsAdmin]
-
-    def post(self, request, pk):
-        try:
-            user = User.objects.get(pk=pk, role='officer')
-        except User.DoesNotExist:
-            return Response({'error': 'Officer not found.'}, status=404)
-
-        user.is_verified  = True
-        user.verified_at  = timezone.now()
-        user.verified_by  = request.user
-        user.save()
-
-        return Response({'message': f'{user.email} has been verified.'})
-
-
 class UserListView(APIView):
     """
     GET /api/auth/users/
@@ -709,9 +668,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'email', 'full_name', 'first_name', 'last_name',
             'role', 'badge_number', 'department_name', 'department_address',
             'department_state', 'ori', 'phone_number', 'rank', 'division',
-            'is_verified', 'subscription', 'last_active', 'created_at',
+            'is_supervisor', 'subscription', 'last_active', 'created_at',
         ]
-        read_only_fields = ['id', 'email', 'role', 'is_verified', 'created_at']
+        read_only_fields = ['id', 'email', 'role', 'is_supervisor', 'created_at']
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -1775,7 +1734,6 @@ class PlatformStatsView(APIView):
             'users': {
                 'total'    : User.objects.count(),
                 'officers' : User.objects.filter(role='officer').count(),
-                'verified' : User.objects.filter(is_verified=True).count(),
                 'new_7d'   : User.objects.filter(
                     created_at__gte=last_7d).count(),
             },
@@ -1963,12 +1921,11 @@ urlpatterns = [
 ```python
 # accounts/urls.py
 from django.urls import path
-from .views import RegisterView, ProfileView, VerifyOfficerView, UserListView
+from .views import RegisterView, ProfileView, UserListView
 
 urlpatterns = [
     path('register/',           RegisterView.as_view()),
     path('profile/',            ProfileView.as_view()),
-    path('verify/<int:pk>/',    VerifyOfficerView.as_view()),
     path('users/',              UserListView.as_view()),
 ]
 

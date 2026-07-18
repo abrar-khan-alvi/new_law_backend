@@ -4,14 +4,18 @@ import uuid
 
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.html import escape
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from django.core.exceptions import ValidationError
+
 from accounts.permissions import IsAdmin
 from utils.pagination import StandardPagination
 from utils.storage import delete_upload, store_upload
+from utils.validators import validate_file_signature
 
 from .filters import BlogPostFilter
 from .models import BlogMedia, BlogPost, Tag
@@ -23,7 +27,10 @@ from .serializers import (
     TagSerializer,
 )
 
-ALLOWED_IMAGE = {'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'}
+# SVG deliberately excluded: it's XML, not a fixed binary format a magic-byte
+# check can validate, and can carry an embedded <script> that runs if the
+# stored file is ever opened directly — a real stored-XSS vector via upload.
+ALLOWED_IMAGE = {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}
 ALLOWED_VIDEO = {'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo'}
 
 
@@ -98,6 +105,8 @@ class BlogMediaUploadView(APIView):
             video_url = request.data.get('video_url', '')
             if not video_url:
                 return Response({'error': {'detail': 'video_url is required.'}}, status=400)
+            if not re.match(r'^https?://', video_url, re.IGNORECASE):
+                return Response({'error': {'detail': 'video_url must be an http(s) URL.'}}, status=400)
             media = BlogMedia.objects.create(
                 post=post, media_type='video_url', video_url=video_url,
                 embed_html=self._embed(video_url),
@@ -112,11 +121,19 @@ class BlogMediaUploadView(APIView):
         if not file:
             return Response({'error': {'detail': 'No file provided.'}}, status=400)
 
+        # The filename extension (via mimetypes.guess_type) and the browser's
+        # Content-Type header are both attacker-controlled — a file named
+        # "x.png" can contain anything. validate_file_signature checks the
+        # actual leading bytes before anything is stored or served back.
         mime = mimetypes.guess_type(file.name)[0] or 'application/octet-stream'
         if media_type == 'image' and mime not in ALLOWED_IMAGE:
             return Response({'error': {'detail': f'Invalid image type: {mime}'}}, status=400)
         if media_type == 'video' and mime not in ALLOWED_VIDEO:
             return Response({'error': {'detail': f'Invalid video type: {mime}'}}, status=400)
+        try:
+            validate_file_signature(file, mime)
+        except ValidationError as e:
+            return Response({'error': {'detail': str(e)}}, status=400)
 
         ext = file.name.rsplit('.', 1)[-1].lower() if '.' in file.name else 'bin'
         key = f'blog/{media_type}s/{uuid.uuid4()}.{ext}'
@@ -134,6 +151,10 @@ class BlogMediaUploadView(APIView):
 
     @staticmethod
     def _embed(url):
+        # yt/vimeo IDs are already constrained to safe charsets by their regexes.
+        # The generic fallback interpolates the caller-supplied URL directly into
+        # HTML, so it must be escaped — otherwise a crafted video_url becomes a
+        # stored XSS payload served to every visitor of the public blog post.
         yt = re.search(r'(?:youtube\.com/watch\?v=|youtu\.be/)([A-Za-z0-9_-]{11})', url)
         if yt:
             return (f'<iframe width="560" height="315" '
@@ -143,7 +164,7 @@ class BlogMediaUploadView(APIView):
         if vm:
             return (f'<iframe src="https://player.vimeo.com/video/{vm.group(1)}" '
                     f'width="560" height="315" frameborder="0" allowfullscreen></iframe>')
-        return f'<video src="{url}" controls></video>'
+        return f'<video src="{escape(url)}" controls></video>'
 
 
 class BlogMediaDeleteView(APIView):

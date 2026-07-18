@@ -60,10 +60,10 @@ class Command(BaseCommand):
             email=EMAIL, defaults={'role': 'officer', 'first_name': 'Smoke', 'last_name': 'Officer'})
         user.role = 'officer'
         user.email_verified = True
-        user.is_verified = True
         user.department_name = 'Test PD'
         user.rank = 'Sergeant'
         user.badge_number = 'T-001'
+        user.ori = 'TE0000000'  # required for incident-report export as of this check
         user.set_password(PASSWORD)
         user.save()
         sub, _ = Subscription.objects.get_or_create(user=user, defaults={'plan': pro})

@@ -12,13 +12,11 @@ from .views import (
     ResendVerificationView,
     UserListView,
     VerifyEmailView,
-    VerifyOfficerView,
-    AgencyCreateView,
 )
 
 urlpatterns = [
-    # Agency configuration
-    path('agencies/', AgencyCreateView.as_view()),
+    # Agency configuration now lives under /api/admin-panel/agencies/ (admin-only —
+    # see admin_panel/views.py). Officers get read-only visibility via /profile/.
     # Registration & email verification
     path('register/', RegisterView.as_view()),
     path('verify-email/', VerifyEmailView.as_view()),
@@ -36,6 +34,5 @@ urlpatterns = [
     path('password-reset/confirm/', PasswordResetConfirmView.as_view()),
 
     # Admin
-    path('verify-officer/<int:pk>/', VerifyOfficerView.as_view()),
     path('users/', UserListView.as_view()),
 ]

@@ -1,4 +1,3 @@
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -10,6 +9,7 @@ from .emails import send_password_reset_email, send_verification_email
 from .models import EmailOTP, User
 from .otp import seconds_until_resend, verify_otp
 from .permissions import IsAdmin
+from utils.audit_log import log_event
 from .serializers import (
     ChangePasswordSerializer,
     CustomTokenObtainPairSerializer,
@@ -19,7 +19,6 @@ from .serializers import (
     UserProfileSerializer,
     UserUpdateSerializer,
     VerifyEmailSerializer,
-    AgencySerializer,
 )
 
 
@@ -88,6 +87,16 @@ class LoginView(TokenObtainPairView):
     authentication_classes = []
     serializer_class = CustomTokenObtainPairSerializer
 
+    def post(self, request, *args, **kwargs):
+        email = (request.data.get('email') or '').strip() or '(none provided)'
+        try:
+            response = super().post(request, *args, **kwargs)
+        except Exception:
+            log_event(None, 'auth.login_failed', severity='warning', email=email)
+            raise
+        log_event(None, 'auth.login', severity='info', email=email)
+        return response
+
 
 class LogoutView(APIView):
     """POST /api/auth/logout/ — blacklist the refresh token."""
@@ -100,6 +109,7 @@ class LogoutView(APIView):
             return Response({'error': 'refresh token is required.'}, status=400)
         except Exception:
             return Response({'error': 'Invalid refresh token.'}, status=400)
+        log_event(request.user, 'auth.logout', severity='info')
         return Response({'message': 'Logged out.'}, status=205)
 
 
@@ -115,24 +125,6 @@ class ProfileView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(UserProfileSerializer(request.user).data)
-
-
-class AgencyCreateView(APIView):
-    """POST /api/auth/agencies/ — create an agency and link it to the current officer."""
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        if request.user.agency:
-            return Response({'error': 'You are already assigned to an agency.'}, status=400)
-            
-        serializer = AgencySerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        agency = serializer.save()
-        
-        request.user.agency = agency
-        request.user.save(update_fields=['agency'])
-        
-        return Response(AgencySerializer(agency).data, status=status.HTTP_201_CREATED)
 
 
 class ChangePasswordView(APIView):
@@ -187,22 +179,6 @@ class PasswordResetConfirmView(APIView):
 
 
 # ── Admin endpoints ──────────────────────────────────────────────────
-class VerifyOfficerView(APIView):
-    """POST /api/auth/verify-officer/<pk>/ — admin vets an officer account."""
-    permission_classes = [IsAdmin]
-
-    def post(self, request, pk):
-        try:
-            user = User.objects.get(pk=pk, role='officer')
-        except User.DoesNotExist:
-            return Response({'error': 'Officer not found.'}, status=404)
-        user.is_verified = True
-        user.verified_at = timezone.now()
-        user.verified_by = request.user
-        user.save(update_fields=['is_verified', 'verified_at', 'verified_by'])
-        return Response({'message': f'{user.email} has been verified.'})
-
-
 class UserListView(APIView):
     """GET /api/auth/users/ — admin: list all users with subscription info."""
     permission_classes = [IsAdmin]
