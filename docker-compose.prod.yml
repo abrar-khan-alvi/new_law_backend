@@ -20,6 +20,21 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
 
+  ollama:
+    image: ollama/ollama
+    restart: always
+    volumes:
+      - ollama_data:/root/.ollama
+
+  ollama-pull-model:
+    image: ollama/ollama
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: /bin/sh
+    command: -c "until ollama list >/dev/null 2>&1; do echo 'Waiting for Ollama to start...'; sleep 2; done && ollama pull llama3.1:8b"
+    depends_on:
+      - ollama
+
   backend:
     build: .
     command: >
@@ -35,6 +50,7 @@ services:
       DB_HOST: db
       DB_PORT: "5432"
       REDIS_URL: redis://redis:6379/0
+      LOCAL_MODEL_URL: http://ollama:11434
     expose:
       - "8000"
     depends_on:
@@ -42,6 +58,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      ollama-pull-model:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   celery:
@@ -54,11 +72,14 @@ services:
       DB_HOST: db
       DB_PORT: "5432"
       REDIS_URL: redis://redis:6379/0
+      LOCAL_MODEL_URL: http://ollama:11434
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
+      ollama-pull-model:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   celery-beat:
@@ -90,3 +111,4 @@ services:
 
 volumes:
   postgres_data:
+  ollama_data:
