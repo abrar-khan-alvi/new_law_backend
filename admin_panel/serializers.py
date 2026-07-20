@@ -1,3 +1,4 @@
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
 from accounts.models import User
@@ -5,6 +6,24 @@ from documents.models import GeneratedDocument
 from documents.serializers import GeneratedDocumentSerializer
 
 from .models import AuditLog
+
+
+class AdminCreateSerializer(serializers.ModelSerializer):
+    """Admin-only: provision a new platform admin account directly, with no
+    email verification step — the requesting admin is already vetting the
+    person they're granting admin access to."""
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'password', 'first_name', 'last_name']
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        user = User(role=User.Role.ADMIN, is_staff=True, email_verified=True, **validated_data)
+        user.set_password(password)
+        user.save()
+        return user
 
 
 class AdminUserSerializer(serializers.ModelSerializer):

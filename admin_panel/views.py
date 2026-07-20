@@ -25,6 +25,7 @@ from utils.validators import (
 
 from .models import AuditLog
 from .serializers import (
+    AdminCreateSerializer,
     AdminDocumentSerializer,
     AdminGeneratedDocumentSerializer,
     AdminUserSerializer,
@@ -174,6 +175,10 @@ class UserManagementView(APIView):
     GET /api/admin-panel/users/ — list (paginated, searchable by ?q=).
     Filters: ?role=, ?exclude_role= (e.g. exclude_role=admin for an
     officers-only directory), ?is_active=true|false, ?is_supervisor=true|false.
+
+    POST /api/admin-panel/users/ — provision a new platform admin account
+    (role is always forced to admin here; officers self-register via
+    accounts.RegisterSerializer instead).
     """
     permission_classes = [IsAdmin]
 
@@ -197,6 +202,13 @@ class UserManagementView(APIView):
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
         return paginator.get_paginated_response(AdminUserSerializer(page, many=True).data)
+
+    def post(self, request):
+        serializer = AdminCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        log_event(request.user, 'admin.create', severity='warning', new_admin_email=user.email)
+        return Response(AdminUserSerializer(user).data, status=201)
 
 
 class UserDetailView(APIView):
