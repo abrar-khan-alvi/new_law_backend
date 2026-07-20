@@ -10,6 +10,7 @@ Regression tests for the requirements-driven changes to document generation:
 """
 from unittest.mock import patch
 
+import shortuuid
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
@@ -105,6 +106,9 @@ class OfficerProfileAgencyMergeTests(TestCase):
 
 
 class JurisdictionExportDispatchTests(TestCase):
+    """Federal agencies fill the official AO forms; state/municipal agencies get
+    the same AO template layout drawn with their own jurisdiction header."""
+
     def _officer(self, jurisdiction_type):
         return {
             'full_name': 'Jane Doe', 'rank': 'Officer', 'badge_number': '123',
@@ -121,9 +125,16 @@ class JurisdictionExportDispatchTests(TestCase):
         mock_fill.assert_called_once()
 
     @patch('documents.exporters.ao_forms.fill_search_warrant')
-    def test_state_search_warrant_skips_ao_forms(self, mock_fill):
+    def test_state_search_warrant_uses_dynamic_header_builder(self, mock_fill):
         form_data = {'court': {}, 'place_to_search': {'description': 'a house'}, 'offenses': []}
         content = render_pdf('search_warrant', form_data, 'narrative', self._officer('state'))
+        mock_fill.assert_not_called()
+        self.assertTrue(content[:4] == b'%PDF')
+
+    @patch('documents.exporters.ao_forms.fill_arrest_warrant')
+    def test_state_arrest_warrant_uses_dynamic_header_builder(self, mock_fill):
+        form_data = {'court': {}, 'defendant': {'full_name': 'John Roe'}}
+        content = render_pdf('arrest_warrant', form_data, 'narrative', self._officer('state'))
         mock_fill.assert_not_called()
         self.assertTrue(content[:4] == b'%PDF')
 
@@ -136,6 +147,28 @@ class JurisdictionExportDispatchTests(TestCase):
         }
         render_pdf('search_warrant', form_data, 'narrative', self._officer('state'))
         mock_fill.assert_called_once()
+
+
+class CaseNumberFormatTests(TestCase):
+    """Agency.case_number_format (Agency Configuration Wizard) drives
+    auto-generated case numbers."""
+
+    def _user_with_format(self, fmt):
+        agency = Agency.objects.create(name=f'PD {fmt or "none"}', case_number_format=fmt)
+        return User.objects.create(email=f'cn-{shortuuid.uuid()[:8]}@example.com', agency=agency)
+
+    def test_format_tokens_are_expanded(self):
+        from django.utils import timezone
+
+        from documents.views import _auto_case_number
+        user = self._user_with_format('SW-YYYY-#####')
+        number = _auto_case_number(user)
+        self.assertRegex(number, rf'^SW-{timezone.now().year}-\d{{5}}$')
+
+    def test_no_agency_falls_back_to_le_prefix(self):
+        from documents.views import _auto_case_number
+        user = User.objects.create(email='cn-noagency@example.com')
+        self.assertTrue(_auto_case_number(user).startswith('LE-'))
 
 
 class IncidentReportExportValidationTests(TestCase):
@@ -199,3 +232,47 @@ class IncidentReportExportValidationTests(TestCase):
         force_authenticate(req, user=self.user)
         resp = ExportDocumentView.as_view()(req, pk=warrant.id)
         self.assertEqual(resp.status_code, 200)
+
+
+class AdminExportOnBehalfOfOfficerTests(TestCase):
+    """
+    An admin who approves a document needs to be able to export/file it too,
+    not just review and sign it — ExportDocumentView used to hard-filter to
+    user=request.user, which 404'd for anyone but the owning officer.
+    """
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.owner = User.objects.create(
+            email='owner@example.com', role='officer', badge_number='B-1',
+            department_name='Owner PD', ori='OW0000001',
+        )
+        self.other_officer = User.objects.create(email='other@example.com', role='officer')
+        self.admin = User.objects.create(email='export-admin@example.com', role='admin')
+        self.doc = GeneratedDocument.objects.create(
+            user=self.owner, doc_type='search_warrant', case_number='LE-ADMIN1',
+            form_data={'offenses': [], 'place_to_search': {'description': 'x'}},
+            ai_narrative='A test affidavit.', status=GeneratedDocument.Status.COMPLETED,
+        )
+
+    def _export_as(self, user):
+        req = self.factory.post(f'/api/documents/{self.doc.id}/export/', {'format': 'pdf'}, format='json')
+        force_authenticate(req, user=user)
+        return ExportDocumentView.as_view()(req, pk=self.doc.id)
+
+    def test_admin_can_export_someone_elses_document(self):
+        resp = self._export_as(self.admin)
+        self.assertEqual(resp.status_code, 200)
+
+    def test_other_officer_cannot_export_someone_elses_document(self):
+        resp = self._export_as(self.other_officer)
+        self.assertEqual(resp.status_code, 403)
+
+    @patch('documents.views.render_pdf')
+    def test_admin_export_stamps_document_owners_identity_not_their_own(self, mock_render):
+        mock_render.return_value = b'%PDF-FAKE'
+        self._export_as(self.admin)
+        officer_arg = mock_render.call_args[0][3]
+        self.assertEqual(officer_arg['badge_number'], 'B-1')
+        self.assertEqual(officer_arg['department_name'], 'Owner PD')
+        self.assertNotEqual(officer_arg.get('email'), 'export-admin@example.com')

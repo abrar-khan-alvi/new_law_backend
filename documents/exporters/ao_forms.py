@@ -28,7 +28,7 @@ CHARGING_ON_STATE = {
 }
 
 
-def _text_map(form_data):
+def _text_map(form_data, officer):
     court = form_data.get('court', {})
     defn = form_data.get('defendant', {})
     off = form_data.get('offense', {})
@@ -40,7 +40,8 @@ def _text_map(form_data):
     )
     return {
         # Page 1 (warrant face)
-        'Dist.Info': court.get('district', ''),
+        'Dist.Info': (court.get('district') or officer.get('agency_judicial_district')
+                      or officer.get('agency_state') or ''),
         'Defendant1': name,
         'Defendant2': name,
         'Case number': form_data.get('case_number', ''),
@@ -73,7 +74,7 @@ def _text_map(form_data):
 
 
 def fill_arrest_warrant(form_data, narrative, officer, doc_meta=None) -> bytes:
-    text_map = _text_map(form_data)
+    text_map = _text_map(form_data, officer)
     charge_state = CHARGING_ON_STATE.get(form_data.get('charging_document', ''))
 
     doc = fitz.open(AO442_PATH)
@@ -108,9 +109,17 @@ def fill_search_warrant(form_data, narrative, officer, doc_meta=None) -> bytes:
     Attachment A / Attachment B / Affidavit pages.
     """
     court = form_data.get('court', {})
-    district = court.get('district', '')
-    prefix, _, state = district.partition(' District of ')  # "Central"/"California"
+    district = (court.get('district') or officer.get('agency_judicial_district')
+                or officer.get('agency_state') or '')
+    # "Central District of California" -> ("Central", "California");
+    # "District of Connecticut" -> ("", "Connecticut") — the form already
+    # prints "District of", so only the parts around it are overlaid. Anything
+    # that doesn't match the pattern goes whole into the wide second blank.
+    prefix, sep, state = district.partition(' District of ')
+    if not sep:
+        prefix, state = '', district.removeprefix('District of ').strip()
     execution = form_data.get('execution', {})
+    place = form_data.get('place_to_search', {})
 
     doc = fitz.open(AO93_PATH)
     page = doc[0]
@@ -122,8 +131,15 @@ def fill_search_warrant(form_data, narrative, officer, doc_meta=None) -> bytes:
     # Caption: "for the ___ District of ___"
     put(232, 119, prefix)
     put(335, 119, state)
+    # Caption block: "In the Matter of the Search of (Briefly describe…)" —
+    # the property description/address goes right under the italic hint text.
+    caption = '\n'.join(t for t in [place.get('description'), place.get('address')] if t)
+    for size in (9, 8, 7, 6):
+        if not caption or page.insert_textbox(
+                fitz.Rect(35, 176, 295, 245), caption, fontsize=size) >= 0:
+            break
     # "located in the ___ District of ___"
-    put(315, 284, prefix)
+    put(240, 284, prefix)
     put(415, 284, state)
     # Case number
     put(372, 172, form_data.get('case_number', ''))

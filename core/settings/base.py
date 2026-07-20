@@ -2,6 +2,7 @@
 Base settings shared across all environments.
 Environment-specific overrides live in development.py / production.py.
 """
+from datetime import timedelta
 from pathlib import Path
 
 import environ
@@ -41,8 +42,9 @@ THIRD_PARTY_APPS = [
     'django_filters',
     'django_celery_beat',
     'django_celery_results',
+    'axes',
     # Added in later phases as modules are built:
-    # 'storages', 'axes', 'drf_spectacular',
+    # 'storages', 'drf_spectacular',
 ]
 
 LOCAL_APPS = [
@@ -70,7 +72,34 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Must come after AuthenticationMiddleware; tracks/locks out failed logins.
+    'axes.middleware.AxesMiddleware',
 ]
+
+# ── django-axes: per-endpoint brute-force lockout on login ───────────
+# AxesStandaloneBackend must be first — it short-circuits authenticate()
+# once an IP/username combo is locked out, before ModelBackend even checks
+# the password. Without this, login was protected only by the blanket
+# DRF anon/user throttle (100-1000/day), which is trivial to work around by
+# spreading attempts across source IPs.
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+AXES_FAILURE_LIMIT = env.int('AXES_FAILURE_LIMIT', default=5)
+AXES_COOLOFF_TIME = timedelta(minutes=env.int('AXES_COOLOFF_MINUTES', default=30))
+# Two independent lockout dimensions (each a separate top-level list entry —
+# NOT combined into one AND'd key): a single account gets locked after enough
+# failures against it regardless of source IP, AND a single IP gets locked
+# after enough failures regardless of which username it's hitting — the
+# latter is what actually stops credential stuffing spread across accounts.
+AXES_LOCKOUT_PARAMETERS = ['username', 'ip_address']
+AXES_RESET_ON_SUCCESS = True
+# The login field is "email" (USERNAME_FIELD), not axes' "username" default —
+# without this, axes can never read a real value for the username half of
+# AXES_LOCKOUT_PARAMETERS, and every request (from every account) collapses
+# into one shared (None, ip_address) bucket.
+AXES_USERNAME_FORM_FIELD = 'email'
 
 ROOT_URLCONF = 'core.urls'
 
@@ -188,21 +217,21 @@ OTP_MAX_ATTEMPTS = env.int('OTP_MAX_ATTEMPTS', default=5)
 OTP_RESEND_COOLDOWN_SECONDS = env.int('OTP_RESEND_COOLDOWN_SECONDS', default=60)
 
 # ── JWT (djangorestframework-simplejwt) ──────────────────────────────
-from datetime import timedelta  # noqa: E402
-
+# A leaked/stolen token should not stay valid indefinitely. 1 hour / 14 days
+# are the hardened defaults; override via env if a longer-lived access token
+# is genuinely needed for a specific deployment.
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=365),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=3650),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=env.int('JWT_ACCESS_TOKEN_MINUTES', default=60)),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=env.int('JWT_REFRESH_TOKEN_DAYS', default=14)),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-# ── Django Session/CSRF Cookie Expiry Hardening ─────────────────────
-# Prevent Django-based / admin sessions from expiring
-SESSION_COOKIE_AGE = 315360000  # 10 years in seconds
+# ── Django Session/CSRF Cookie Expiry ────────────────────────────────
+SESSION_COOKIE_AGE = env.int('SESSION_COOKIE_AGE', default=1209600)  # 14 days
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-CSRF_COOKIE_AGE = 315360000  # 10 years in seconds
+CSRF_COOKIE_AGE = env.int('CSRF_COOKIE_AGE', default=1209600)  # 14 days
 
 
 # ── AI model ─────────────────────────────────────────────────────────
@@ -283,5 +312,9 @@ CELERY_BEAT_SCHEDULE = {
     'cleanup-failed-documents': {
         'task': 'documents.tasks.cleanup_failed_documents',
         'schedule': crontab(hour=2, minute=0),  # daily at 02:00
+    },
+    'reclaim-stuck-generating-documents': {
+        'task': 'documents.tasks.reclaim_stuck_generating_documents',
+        'schedule': crontab(minute='*/5'),  # every 5 minutes
     },
 }

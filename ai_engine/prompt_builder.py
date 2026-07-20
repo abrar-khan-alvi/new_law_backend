@@ -73,6 +73,23 @@ def _sanitize_examples(text: str) -> str:
     return text
 
 
+# Collapses runs of 2+ of =, <, > down to a single character. Officer-supplied
+# form_data is interpolated directly next to the literal boundary markers
+# (=== FACTS ===, === END FACTS ===, <<<BEGIN STYLE SAMPLES, END STYLE
+# SAMPLES>>>) the model is told to trust as structural boundaries — without
+# this, text containing that exact marker string could spoof an early
+# end-of-facts and get the model to treat attacker-authored text that follows
+# as new instructions. Equals/angle-bracket runs are essentially never
+# legitimate in officer narrative text, so this is safe to apply broadly.
+_DELIMITER_DEFUSE_RE = re.compile(r'([=<>])\1+')
+
+
+def _defuse(value) -> str:
+    if value is None:
+        return ''
+    return _DELIMITER_DEFUSE_RE.sub(r'\1', str(value))
+
+
 def _officer_block(officer: dict) -> str:
     agency_name = officer.get('agency_name') or officer.get('department_name', '')
     return (
@@ -145,10 +162,10 @@ def build_incident_report_prompt(form_data, officer, narrative_style='first_pers
     incident = form_data.get('incident', {})
     parties = form_data.get('involved_parties', [])
 
-    categories = ', '.join(incident.get('categories', []))
+    categories = _defuse(', '.join(incident.get('categories', [])))
     party_lines = '\n'.join(
-        f"- {p.get('role', 'other')}: {p.get('full_name', '')}"
-        + (f" (ID {p['id_number']})" if p.get('id_number') else '')
+        f"- {_defuse(p.get('role', 'other'))}: {_defuse(p.get('full_name', ''))}"
+        + (f" (ID {_defuse(p['id_number'])})" if p.get('id_number') else '')
         for p in parties
     ) or '- (none listed)'
 
@@ -162,8 +179,8 @@ def build_incident_report_prompt(form_data, officer, narrative_style='first_pers
         f"{_officer_block(officer)}\n"
         "Incident context (for accuracy):\n"
         f"- Categories: {categories or 'N/A'}\n"
-        f"- Date/Time: {incident.get('date', '')} {incident.get('time', '')}\n"
-        f"- Location: {incident.get('location', '')}\n"
+        f"- Date/Time: {_defuse(incident.get('date', ''))} {_defuse(incident.get('time', ''))}\n"
+        f"- Location: {_defuse(incident.get('location', ''))}\n"
         "Involved parties:\n"
         f"{party_lines}\n"
     )
@@ -173,14 +190,14 @@ def build_incident_report_prompt(form_data, officer, narrative_style='first_pers
 
     facts_block = (
         "\n=== FACTS (the ONLY source of truth for this report) ===\n"
-        f"- Who: {facts.get('who', '')}\n"
-        f"- What: {facts.get('what', '')}\n"
-        f"- When: {facts.get('when', '')}\n"
-        f"- Where: {facts.get('where', '')}\n"
-        f"- Why: {facts.get('why', '')}\n"
-        f"- How: {facts.get('how', '')}\n"
-        f"- Officer actions: {facts.get('officer_actions', '')}\n"
-        f"- Additional notes: {facts.get('additional_notes', '')}\n"
+        f"- Who: {_defuse(facts.get('who', ''))}\n"
+        f"- What: {_defuse(facts.get('what', ''))}\n"
+        f"- When: {_defuse(facts.get('when', ''))}\n"
+        f"- Where: {_defuse(facts.get('where', ''))}\n"
+        f"- Why: {_defuse(facts.get('why', ''))}\n"
+        f"- How: {_defuse(facts.get('how', ''))}\n"
+        f"- Officer actions: {_defuse(facts.get('officer_actions', ''))}\n"
+        f"- Additional notes: {_defuse(facts.get('additional_notes', ''))}\n"
         "=== END FACTS ===\n"
     )
 
@@ -193,13 +210,13 @@ def build_incident_report_prompt(form_data, officer, narrative_style='first_pers
 # to organizing the officer's facts into ONE factual investigation narrative.
 # It never drafts the legal-conclusion sentences (nexus/elements/citations);
 # those are fixed, pre-approved text with placeholders filled directly from
-# form_data, assembled in documents/views.py::_run_generation.
+# form_data, assembled in documents/generation.py::run_generation.
 def build_search_warrant_prompt(form_data, officer, narrative_style='first_person'):
     pc = form_data.get('probable_cause', {})
-    offenses = ', '.join(
+    offenses = _defuse(', '.join(
         f"{o.get('code_section', '')} ({o.get('description', '')})"
         for o in form_data.get('offenses', [])
-    )
+    ))
     place = form_data.get('place_to_search', {})
 
     header = (
@@ -226,11 +243,11 @@ def build_search_warrant_prompt(form_data, officer, narrative_style='first_perso
     facts_block = (
         "\n=== FACTS (the ONLY source of truth for this narrative) ===\n"
         f"- Offenses: {offenses}\n"
-        f"- Place to search: {place.get('description', '')} — {place.get('address', '')}\n"
-        f"- Affiant background: {pc.get('affiant_background', '')}\n"
-        f"- Investigation summary: {pc.get('investigation_summary', '')}\n"
-        f"- Timeline: {'; '.join(pc.get('timeline', []))}\n"
-        f"- Prior warrants: {pc.get('prior_warrants', '') or 'none'}\n"
+        f"- Place to search: {_defuse(place.get('description', ''))} — {_defuse(place.get('address', ''))}\n"
+        f"- Affiant background: {_defuse(pc.get('affiant_background', ''))}\n"
+        f"- Investigation summary: {_defuse(pc.get('investigation_summary', ''))}\n"
+        f"- Timeline: {_defuse('; '.join(pc.get('timeline', [])))}\n"
+        f"- Prior warrants: {_defuse(pc.get('prior_warrants', '')) or 'none'}\n"
         "=== END FACTS ===\n"
         "(Note: the nexus-to-place reasoning is handled by the fixed closing "
         "section, not by you — do not restate it here.)\n"
@@ -238,7 +255,7 @@ def build_search_warrant_prompt(form_data, officer, narrative_style='first_perso
 
     if not (pc.get('investigation_summary') or pc.get('affiant_background') or pc.get('timeline')):
         # No narrative facts supplied — nothing for the AI to organize;
-        # _run_generation will skip the AI call and use the template alone.
+        # run_generation() will skip the AI call and use the template alone.
         return ''
 
     return header + style + facts_block + _ANTI_LEAK + (
@@ -272,16 +289,16 @@ def build_arrest_warrant_prompt(form_data, officer, narrative_style='first_perso
 
     facts_block = (
         "\n=== FACTS (the ONLY source of truth for this narrative) ===\n"
-        f"- Defendant: {form_data.get('defendant', {}).get('full_name', '')}\n"
-        f"- Offense: {offense.get('code_section', '')} — {offense.get('brief_description', '')}\n"
-        f"- Facts: {pc.get('facts', '') or '(none)'}\n"
-        f"- Timeline: {'; '.join(pc.get('timeline', []))}\n"
+        f"- Defendant: {_defuse(form_data.get('defendant', {}).get('full_name', ''))}\n"
+        f"- Offense: {_defuse(offense.get('code_section', ''))} — {_defuse(offense.get('brief_description', ''))}\n"
+        f"- Facts: {_defuse(pc.get('facts', '')) or '(none)'}\n"
+        f"- Timeline: {_defuse('; '.join(pc.get('timeline', [])))}\n"
         "=== END FACTS ===\n"
     )
 
     if not (pc.get('facts') or pc.get('timeline')):
         # No narrative facts supplied at all — nothing for the AI to organize;
-        # _run_generation will skip the AI call and use the template alone.
+        # run_generation() will skip the AI call and use the template alone.
         return ''
 
     return header + style + facts_block + _ANTI_LEAK + (

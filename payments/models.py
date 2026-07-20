@@ -49,3 +49,23 @@ class Invoice(models.Model):
 
     def __str__(self):
         return f'Invoice {self.stripe_invoice_id or self.id} — {self.user.email}'
+
+
+class WebhookEvent(models.Model):
+    """
+    Records every Stripe webhook event ID we've successfully processed.
+    Stripe retries delivery on any non-2xx response or slow reply, and
+    without this, a retried checkout.session.completed would silently
+    re-zero documents_generated_this_month on every redelivery — this is
+    the dedup guard that makes handle_webhook() idempotent per event ID.
+    """
+    stripe_event_id = models.CharField(max_length=255, unique=True)
+    event_type = models.CharField(max_length=100)
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'webhook_events'
+        ordering = ['-received_at']
+
+    def __str__(self):
+        return f'{self.event_type} ({self.stripe_event_id})'

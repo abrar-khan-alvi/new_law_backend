@@ -1,7 +1,10 @@
+from axes.handlers.proxy import AxesProxyHandler
+from django.conf import settings
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
@@ -20,6 +23,14 @@ from .serializers import (
     UserUpdateSerializer,
     VerifyEmailSerializer,
 )
+
+
+def _blacklist_all_tokens(user):
+    """Revoke every outstanding refresh token for this user. Called on
+    password change/reset so a token that leaked (plausibly the whole reason
+    for the reset) doesn't keep working afterward."""
+    for token in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=token)
 
 
 class RegisterView(APIView):
@@ -89,6 +100,22 @@ class LoginView(TokenObtainPairView):
 
     def post(self, request, *args, **kwargs):
         email = (request.data.get('email') or '').strip() or '(none provided)'
+
+        # django-axes' lockout normally surfaces through AxesMiddleware reading
+        # a flag set on the request object passed into authenticate() — but
+        # simplejwt passes the DRF-wrapped Request (via serializer context),
+        # a different object than the raw HttpRequest the middleware sees, so
+        # that flag never arrives. Checked explicitly here instead so a locked
+        # out account gets an honest 429, not a generic "wrong credentials".
+        credentials = {settings.AXES_USERNAME_FORM_FIELD: email}
+        if not AxesProxyHandler.is_allowed(request, credentials):
+            log_event(None, 'auth.login_locked_out', severity='warning', email=email)
+            return Response(
+                {'error': {'detail': 'Too many failed login attempts. Try again later.',
+                           'code': 'locked_out'}},
+                status=429,
+            )
+
         try:
             response = super().post(request, *args, **kwargs)
         except Exception:
@@ -138,6 +165,7 @@ class ChangePasswordView(APIView):
             return Response({'error': 'Current password is incorrect.'}, status=400)
         request.user.set_password(serializer.validated_data['new_password'])
         request.user.save(update_fields=['password'])
+        _blacklist_all_tokens(request.user)
         return Response({'message': 'Password changed.'})
 
 
@@ -175,6 +203,7 @@ class PasswordResetConfirmView(APIView):
 
         user.set_password(serializer.validated_data['new_password'])
         user.save(update_fields=['password'])
+        _blacklist_all_tokens(user)
         return Response({'message': 'Password has been reset. You can now log in.'})
 
 

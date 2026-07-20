@@ -133,11 +133,15 @@ class Subscription(models.Model):
             'documents_generated_this_month', 'warrants_generated_this_month', 'usage_reset_date',
         ])
 
+    _WARRANT_DOC_TYPES = {'search_warrant', 'arrest_warrant'}
+
     def _quota_field_for(self, doc_type: str):
         """(counter_field_name, limit) for the quota bucket a doc_type draws from."""
         if doc_type == 'incident_report':
             return 'documents_generated_this_month', self.plan.document_limit
-        return 'warrants_generated_this_month', self.plan.warrant_document_limit
+        if doc_type in self._WARRANT_DOC_TYPES:
+            return 'warrants_generated_this_month', self.plan.warrant_document_limit
+        raise ValueError(f'Unrecognized doc_type for quota accounting: {doc_type!r}')
 
     def try_reserve_quota(self, doc_type: str) -> bool:
         """

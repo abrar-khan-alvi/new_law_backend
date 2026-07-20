@@ -9,13 +9,22 @@ import logging
 audit = logging.getLogger('audit')
 
 
+def _sanitize(value) -> str:
+    """Neutralize newlines/carriage returns in a value before it's woven into
+    a single log line. Without this, a caller-supplied value (e.g. an
+    officer-entered case_number) containing '\\n' plus a fake 'action=' token
+    could forge what looks like a separate, legitimate audit log entry —
+    a real risk for a tamper-evident audit trail on a law-enforcement product."""
+    return str(value).replace('\r', '\\r').replace('\n', '\\n')
+
+
 def _who(user):
-    return getattr(user, 'email', None) or 'anonymous'
+    return _sanitize(getattr(user, 'email', None) or 'anonymous')
 
 
 def log_event(user, action: str, severity: str = 'info', **details):
-    detail_str = ' '.join(f'{k}={v}' for k, v in details.items())
-    audit.info('user=%s action=%s severity=%s %s', _who(user), action, severity, detail_str)
+    detail_str = ' '.join(f'{k}={_sanitize(v)}' for k, v in details.items())
+    audit.info('user=%s action=%s severity=%s %s', _who(user), _sanitize(action), severity, detail_str)
 
     # Lazy import: this module is imported very early (views, signals) and
     # must not create a hard import-time dependency on the admin_panel app.

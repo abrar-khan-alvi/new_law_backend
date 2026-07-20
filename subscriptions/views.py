@@ -86,6 +86,29 @@ class CancelSubscriptionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        sub = getattr(request.user, 'subscription', None)
+        if not sub:
+            return Response(
+                {'error': {'detail': 'No paid subscription to cancel.', 'code': 'no_paid_subscription'}},
+                status=400,
+            )
+
+        # A trial never touches Stripe by design, so it has no
+        # stripe_subscription_id to cancel — revert to Free immediately
+        # instead of waiting out the remaining trial days. Purely local
+        # state, so this doesn't need PAYMENTS_ENABLED/Stripe at all.
+        if sub.status == 'trialing':
+            free_plan = Plan.objects.filter(name='free').first()
+            if not free_plan:
+                return Response(
+                    {'error': {'detail': 'No free plan configured.', 'code': 'no_free_plan'}}, status=500)
+            sub.plan = free_plan
+            sub.status = 'active'
+            sub.trial_end = None
+            sub.documents_generated_this_month = 0
+            sub.save(update_fields=['plan', 'status', 'trial_end', 'documents_generated_this_month'])
+            return Response({'message': 'Your trial has ended and your account has reverted to Free.'})
+
         if not settings.PAYMENTS_ENABLED:
             return Response(
                 {'error': {'detail': 'Billing is not enabled yet.',
@@ -93,8 +116,7 @@ class CancelSubscriptionView(APIView):
                 status=503,
             )
 
-        sub = getattr(request.user, 'subscription', None)
-        if not sub or not sub.stripe_subscription_id:
+        if not sub.stripe_subscription_id:
             return Response(
                 {'error': {'detail': 'No paid subscription to cancel.', 'code': 'no_paid_subscription'}},
                 status=400,

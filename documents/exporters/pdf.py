@@ -17,7 +17,6 @@ from reportlab.platypus import (
 
 _styles = getSampleStyleSheet()
 _TITLE = ParagraphStyle('LeTitle', parent=_styles['Title'], fontSize=16, alignment=TA_CENTER)
-_H = ParagraphStyle('LeHeading', parent=_styles['Heading2'], fontSize=12, spaceBefore=12)
 _BODY = ParagraphStyle('LeBody', parent=_styles['BodyText'], fontSize=10, leading=14)
 _SMALL = ParagraphStyle('LeSmall', parent=_styles['BodyText'], fontSize=8, textColor=colors.grey)
 
@@ -29,18 +28,6 @@ def _p(text, style=_BODY):
 def _narrative_paragraphs(narrative):
     blocks = [b.strip() for b in (narrative or '').split('\n\n') if b.strip()]
     return [_p(b) for b in blocks] or [_p('(no narrative)')]
-
-
-def _kv_table(rows):
-    """Two-column label/value table."""
-    data = [[_p(f'<b>{k}</b>', _BODY), _p(str(v), _BODY)] for k, v in rows]
-    t = Table(data, colWidths=[1.8 * inch, 4.7 * inch])
-    t.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('LINEBELOW', (0, 0), (-1, -1), 0.25, colors.lightgrey),
-    ]))
-    return t
 
 
 def _seal_flowable(officer):
@@ -147,7 +134,11 @@ _LABEL = ParagraphStyle('SmyrnaLabel', parent=_styles['BodyText'], fontSize=6, l
 _VALUE = ParagraphStyle('SmyrnaValue', parent=_styles['BodyText'], fontSize=8, leading=9, textColor=colors.black, fontName='Helvetica-Bold')
 
 def _c(label, value):
-    val_str = str(value) if value is not None and str(value).strip() != '' else '-'
+    """Template cell: tiny label, bold value. Empty boxes show the label only,
+    exactly like the printed form (and so an all-labels page stays one page)."""
+    val_str = str(value).strip() if value is not None else ''
+    if val_str in ('', '-'):
+        return [Paragraph(label, _LABEL)]
     return [
         Paragraph(label, _LABEL),
         Paragraph(val_str, _VALUE)
@@ -167,6 +158,28 @@ _GRID_STYLE = TableStyle([
 ])
 
 
+_BAND = ParagraphStyle('SmyrnaBand', parent=_styles['BodyText'], fontSize=5.5, leading=6.5,
+                       alignment=TA_CENTER)
+_INNER_W = 7.2  # inner grid width (inches); 0.3" is the letter band on the left
+
+
+def _banded(label, flowables):
+    """Vertical letter band on the left of a section, as printed on the form
+    (I-N-C-I-D-E-N-T  D-A-T-A …)."""
+    letters = '<br/>'.join('&nbsp;' if ch == ' ' else ch for ch in label)
+    t = Table([[Paragraph(letters, _BAND), flowables]],
+              colWidths=[0.3 * inch, _INNER_W * inch])
+    t.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (0, 0), 'MIDDLE'),
+        ('VALIGN', (1, 0), (1, 0), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    return t
+
+
 # ── Incident report ──────────────────────────────────────────────────
 def _incident(form_data, narrative, officer):
     inc = form_data.get('incident', {})
@@ -177,79 +190,99 @@ def _incident(form_data, narrative, officer):
 
     story = []
 
-    # 1. Header Grid
+    # 1. Header Grid — agency/ORI/location | title + gang/premise/beat |
+    #    stacked Case# / Date Reported / Last Known Secure / At Found column
     case_no = form_data.get('case_number') or '-'
     reported_dt = f"{inc.get('reported_date') or inc.get('date', '')} {inc.get('reported_time') or inc.get('time', '')}".strip()
     secure_dt = f"{inc.get('date', '')} {inc.get('time', '')}".strip()
-    
+
     header_data = [
         [
             _c("Agency Name", officer.get("department_name") or "(department not set)"),
-            Paragraph("<font size=11><b>INCIDENT/INVESTIGATION<br/>REPORT</b></font>", ParagraphStyle('hc', parent=_TITLE, leading=12)),
-            _c("Case#", case_no)
+            Paragraph("<font size=11><b>INCIDENT/INVESTIGATION<br/>REPORT</b></font>",
+                      ParagraphStyle('hc', parent=_TITLE, leading=12)),
+            '', '',
+            _c("Case#", case_no),
         ],
         [
             _c("ORI", officer.get("ori") or "(ORI not set)"),
-            "",
-            _c("Date / Time Reported", reported_dt)
+            '', '', '',
+            _c("Date / Time Reported", reported_dt),
         ],
         [
             _c("Location of Incident", inc.get("location") or "-"),
-            _c("Gang Relat / Premise Type / Beat", f"NO / {inc.get('premise_type') or 'Hotel/motel/etc.'} / D"),
-            _c("Last Known Secure / At Found", f"{secure_dt} / {secure_dt}")
-        ]
+            _c("Gang Relat", "NO"),
+            _c("Premise Type", inc.get('premise_type') or 'Hotel/motel/etc.'),
+            _c("Beat/Tract", "D"),
+            _c("Last Known Secure", secure_dt),
+        ],
+        ['', '', '', '', _c("At Found", secure_dt)],
     ]
-    
-    t_header = Table(header_data, colWidths=[3.0 * inch, 2.3 * inch, 2.2 * inch])
+    t_header = Table(header_data,
+                     colWidths=[3.0 * inch, 0.75 * inch, 1.15 * inch, 0.6 * inch, 1.7 * inch])
     t_header.setStyle(TableStyle([
         ('BOX', (0, 0), (-1, -1), 1, colors.black),
         ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('SPAN', (1, 0), (1, 1)), # Span INCIDENT REPORT title
+        ('SPAN', (1, 0), (3, 1)),   # title block
+        ('SPAN', (0, 2), (0, 3)),   # location box is two rows tall
+        ('SPAN', (1, 2), (1, 3)),
+        ('SPAN', (2, 2), (2, 3)),
+        ('SPAN', (3, 2), (3, 3)),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
         ('TOPPADDING', (0, 0), (-1, -1), 2),
         ('LEFTPADDING', (0, 0), (-1, -1), 4),
         ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-        ('ALIGN', (1, 0), (1, 1), 'CENTER'),
-        ('VALIGN', (1, 0), (1, 1), 'MIDDLE'),
+        ('ALIGN', (1, 0), (3, 1), 'CENTER'),
+        ('VALIGN', (1, 0), (3, 1), 'MIDDLE'),
     ]))
-    story.append(t_header)
-    story.append(Spacer(1, 4))
+    incident_region = [t_header]
 
-    # 2. Crime Incident(s) Grid
+    # 2. Crime Incident(s) Grid — each crime: main row + Entry/Exit/Security sub-row
     categories = inc.get("categories", [])
     if not categories:
         categories = ["General Information / Incident"]
-        
+
     crime_rows = []
     for idx in range(3):
         crime_name = categories[idx] if idx < len(categories) else ""
-        num_str = f"#{idx + 1}"
-        weapon = notif.get("weapon_detail") if notif.get("weapon_involved") else "None"
-        if not crime_name and idx > 0:
-            crime_rows.append([
-                _c(f"#{idx + 1} Crime Incident", ""),
-                _c("Weapon / Tools", ""),
-                _c("Activity / Entry / Exit / Security", "")
-            ])
-        else:
-            crime_rows.append([
-                _c(f"{num_str} Crime Incident(s)", crime_name),
-                _c("Weapon / Tools", weapon or "None"),
-                _c("Activity / Entry / Exit / Security", "N / None / None / None")
-            ])
-            
-    t_crimes = Table(crime_rows, colWidths=[3.5 * inch, 2.0 * inch, 2.0 * inch])
-    t_crimes.setStyle(_GRID_STYLE)
-    story.append(t_crimes)
-    story.append(Spacer(1, 4))
+        weapon = (notif.get("weapon_detail") if notif.get("weapon_involved") else "None") or "None"
+        filled = bool(crime_name)
+        crime_rows.append([
+            _c(f"#{idx + 1} Crime Incident(s)  (Com)", crime_name),
+            _c("Weapon / Tools", weapon if filled else ""),
+            '',
+            _c("Activity", "N" if filled else ""),
+        ])
+        crime_rows.append([
+            '',
+            _c("Entry", "None" if filled else ""),
+            _c("Exit", "None" if filled else ""),
+            _c("Security", "None" if filled else ""),
+        ])
+    t_crimes = Table(crime_rows,
+                     colWidths=[3.0 * inch, 1.55 * inch, 1.5 * inch, 1.15 * inch])
+    crime_style = [
+        ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ('TOPPADDING', (0, 0), (-1, -1), 1),
+        ('LEFTPADDING', (0, 0), (-1, -1), 3),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+    ]
+    for pair in range(3):
+        crime_style.append(('SPAN', (0, pair * 2), (0, pair * 2 + 1)))   # crime cell 2 rows tall
+        crime_style.append(('SPAN', (1, pair * 2), (2, pair * 2)))       # weapon spans two cols
+    t_crimes.setStyle(TableStyle(crime_style))
+    incident_region.append(t_crimes)
+    story.append(_banded('INCIDENT DATA', incident_region))
 
     # 3. MO Block
     mo_val = facts.get("how") or "N/A"
-    t_mo = Table([[_c("MO (Modus Operandi)", mo_val)]], colWidths=[7.5 * inch])
+    t_mo = Table([[_c("MO (Modus Operandi)", mo_val)]], colWidths=[_INNER_W * inch])
     t_mo.setStyle(_GRID_STYLE)
-    story.append(t_mo)
-    story.append(Spacer(1, 4))
+    story.append(_banded('MO', [t_mo]))
 
     # 4. Victim(s) Grid (V1)
     victims = [p for p in parties if p.get('role') == 'victim']
@@ -271,93 +304,103 @@ def _incident(form_data, narrative, officer):
             veh = p_item
             break
             
-    victim_data = [
-        [
+    def _simple_grid(data, widths):
+        t = Table(data, colWidths=[w * inch for w in widths])
+        t.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 1, colors.black),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('LEFTPADDING', (0, 0), (-1, -1), 3),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        return t
+
+    resident = 'Resident' if v.get('address') else 'Non-Resident'
+    victim_tables = [
+        _simple_grid([[
             _c("# of Victims", str(max(1, len(victims)))),
             _c("Type", "INDIVIDUAL (NON LE)"),
             _c("Injury", form_data.get('injuries', {}).get('description') or "None"),
-            _c("Domestic", "N")
-        ],
-        [
+            _c("Domestic", "N"),
+        ]], [1.3, 1.9, 2.1, 1.9]),
+        _simple_grid([[
             _c("V1 Victim/Business Name (Last, First, Middle)", v.get('full_name') or "-"),
-            _c("DOB", dob_val),
-            _c("Age / Race / Sex", f"{age_val} / {v.get('race') or 'U'} / {v.get('sex') or 'M'}"),
-            _c("Relationship / Resident Status", f"INR / {v.get('address') and 'Resident' or 'Non-Resident'}")
-        ],
-        [
+            _c("Victim of Crime #", "1"),
+            _c("DOB / Age", f"{dob_val} / {age_val}"),
+            _c("Race", v.get('race') or 'U'),
+            _c("Sex", v.get('sex') or 'U'),
+            _c("Relationship To Offender", "INR"),
+            _c("Resident Status", resident),
+            _c("Military Branch/Status", "-"),
+        ]], [2.2, 0.7, 1.0, 0.4, 0.4, 0.9, 0.8, 0.8]),
+        _simple_grid([[
             _c("Home Address", v.get('address') or "-"),
             _c("Email", v.get('email') or "-"),
-            _c("Home Phone / Mobile", f"{v.get('phone') or '-'} / {v.get('phone') or '-'}")
-        ],
-        [
+            _c("Home Phone", v.get('phone') or "-"),
+        ]], [3.3, 2.0, 1.9]),
+        _simple_grid([[
             _c("Employer Name/Address", "-"),
             _c("Business Phone", "-"),
-            _c("Vehicle Descriptors: VYR / Make / Model / Style / Color / VIN",
-               f"{veh.get('year') or '-'} / {veh.get('make') or '-'} / {veh.get('model') or '-'} / - / {veh.get('color') or '-'} / {veh.get('serial_or_tag') or '-'}")
-        ]
+            _c("Mobile Phone", v.get('phone') or "-"),
+        ]], [3.3, 2.0, 1.9]),
+        _simple_grid([[
+            _c("VYR", veh.get('year') or "-"),
+            _c("Make", veh.get('make') or "-"),
+            _c("Model", veh.get('model') or "-"),
+            _c("Style", "-"),
+            _c("Color", veh.get('color') or "-"),
+            _c("Lic/Lis", "-"),
+            _c("VIN", veh.get('serial_or_tag') or "-"),
+        ]], [0.7, 1.2, 1.2, 0.9, 0.9, 1.1, 1.2]),
     ]
-    t_victim = Table(victim_data, colWidths=[2.5 * inch, 1.2 * inch, 1.8 * inch, 2.0 * inch])
-    t_victim.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, colors.black),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('SPAN', (2, 2), (3, 2)),
-        ('SPAN', (2, 3), (3, 3)),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-        ('TOPPADDING', (0, 0), (-1, -1), 1),
-        ('LEFTPADDING', (0, 0), (-1, -1), 3),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-    ]))
-    story.append(t_victim)
-    story.append(Spacer(1, 4))
+    story.append(_banded('VICTIM', victim_tables))
 
-    # 5. Others Involved (IO / WI / RP)
+    # CODES legend row (template: sits between the victim and others sections)
+    t_codes = Table([[Paragraph(
+        '<font size=6><b>CODES:</b>   V = Victim (Denote V2, V3)     WI = Witness     '
+        'IO = Involved Other     RP = Reporting Person (if other than victim)</font>', _LABEL)]],
+        colWidths=[_INNER_W * inch])
+    t_codes.setStyle(TableStyle([
+        ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('LEFTPADDING', (0, 0), (-1, -1), 3),
+    ]))
+
+    # 5. Others Involved (IO / WI / RP) — template block per person
     others = [p for p in parties if p.get('role') != 'victim']
-    
-    other_rows = []
+
+    others_tables = [t_codes]
     for idx in range(2):
         o = others[idx] if idx < len(others) else {}
-        role_code = "IO" if o.get('role') == 'suspect' or o.get('role') == 'alleged' else ("WI" if o.get('role') == 'witness' else "IO")
-        dob_o = o.get('dob') or '-'
-        if not o and idx > 0:
-            other_rows.append([
-                _c("Type", ""),
-                _c("Code / Name (Last, First, Middle)", ""),
-                _c("DOB / Age / Race / Sex", ""),
-                _c("Relationship / Resident Status", "")
-            ])
-            other_rows.append([
-                _c("Home Address", ""),
-                _c("Email", ""),
-                _c("Phone / Mobile", "")
-            ])
-        else:
-            other_rows.append([
-                _c("Type", "INDIVIDUAL (NON LE)"),
-                _c(f"Code / Name (Last, First, Middle)", f"{role_code} - {o.get('full_name') or '-'}" if o else "-"),
-                _c("DOB / Age / Race / Sex", f"{dob_o} / - / {o.get('race') or 'U'} / {o.get('sex') or 'M'}"),
-                _c("Relationship / Resident Status", f"None / {o.get('address') and 'Resident' or 'Non-Resident'}")
-            ])
-            other_rows.append([
-                _c("Home Address", o.get('address') or "-"),
-                _c("Email", o.get('email') or "-"),
-                _c("Phone / Mobile / Employer", f"{o.get('phone') or '-'} / - / -")
-            ])
-            
-    t_others = Table(other_rows, colWidths=[2.2 * inch, 2.2 * inch, 1.5 * inch, 1.6 * inch])
-    t_others.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, colors.black),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('SPAN', (2, 1), (3, 1)),
-        ('SPAN', (2, 3), (3, 3)),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-        ('TOPPADDING', (0, 0), (-1, -1), 1),
-        ('LEFTPADDING', (0, 0), (-1, -1), 3),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-    ]))
-    story.append(t_others)
-    story.append(Spacer(1, 4))
+        role_code = "WI" if o.get('role') == 'witness' else "IO"
+        others_tables.append(_simple_grid([[
+            _c("Type:", "INDIVIDUAL (NON LE)" if o else ""),
+            _c("Injury:", ""),
+        ]], [3.6, 3.6]))
+        others_tables.append(_simple_grid([[
+            _c("Code", role_code if o else ""),
+            _c("Name (Last, First, Middle)", o.get('full_name') or ("-" if o else "")),
+            _c("Victim of Crime #", ""),
+            _c("DOB / Age", o.get('dob') or ("-" if o else "")),
+            _c("Race", (o.get('race') or 'U') if o else ""),
+            _c("Sex", (o.get('sex') or 'U') if o else ""),
+            _c("Relationship To Offender", "None" if o else ""),
+            _c("Resident Status", ('Resident' if o.get('address') else 'Non-Resident') if o else ""),
+        ]], [0.5, 2.1, 0.7, 1.0, 0.4, 0.4, 1.1, 1.0]))
+        others_tables.append(_simple_grid([[
+            _c("Home Address", o.get('address') or ("-" if o else "")),
+            _c("Email", o.get('email') or ("-" if o else "")),
+            _c("Home Phone", o.get('phone') or ("-" if o else "")),
+        ]], [3.3, 2.0, 1.9]))
+        others_tables.append(_simple_grid([[
+            _c("Employer Name/Address", "-" if o else ""),
+            _c("Business Phone", "-" if o else ""),
+            _c("Mobile Phone", o.get('phone') or ("-" if o else "")),
+        ]], [3.3, 2.0, 1.9]))
+    story.append(_banded('OTHERS INVOLVED', others_tables))
 
     # 6. Property Segment
     legend_text = "<font size=5 color='#555555'>1 = None  2 = Burned  3 = Counterfeit / Forged  4 = Damaged / Vandalized  5 = Recovered  6 = Seized  7 = Stolen  8 = Unknown</font>"
@@ -367,7 +410,8 @@ def _incident(form_data, narrative, officer):
     prop_rows.append([Paragraph(f"<b>{h}</b>", _LABEL) for h in headers])
     
     prop_items = [p_item for p_item in prop if p_item.get('type') != 'vehicle']
-    for idx in range(3):
+    # Template shows a full block of property rows even when mostly empty.
+    for idx in range(max(8, len(prop_items))):
         p_item = prop_items[idx] if idx < len(prop_items) else {}
         stat_map = {"missing": "7", "stolen": "7", "damaged": "4", "recovered": "5", "seized": "6"}
         code_val = stat_map.get(p_item.get('status'), "1") if p_item else ""
@@ -385,7 +429,8 @@ def _incident(form_data, narrative, officer):
             _p_small(p_item.get('serial_or_tag') or "")
         ])
         
-    t_prop = Table(prop_rows, colWidths=[0.4 * inch, 0.4 * inch, 0.7 * inch, 0.7 * inch, 0.4 * inch, 0.4 * inch, 2.5 * inch, 1.2 * inch, 1.2 * inch])
+    t_prop = Table(prop_rows, colWidths=[w * inch for w in
+                                         [0.35, 0.4, 0.55, 0.6, 0.3, 0.35, 2.35, 1.15, 1.15]])
     t_prop.setStyle(TableStyle([
         ('BOX', (0, 0), (-1, -1), 1, colors.black),
         ('INNERGRID', (0, 1), (-1, -1), 0.5, colors.black),
@@ -397,25 +442,21 @@ def _incident(form_data, narrative, officer):
         ('RIGHTPADDING', (0, 0), (-1, -1), 2),
         ('BACKGROUND', (0, 1), (-1, 1), colors.whitesmoke),
     ]))
-    story.append(t_prop)
-    story.append(Spacer(1, 4))
+    story.append(_banded('PROPERTY', [t_prop]))
 
-    # 7. Responding Officers & Case Info
-    footer_data = [
-        [
-            _c("Officer / ID#", f"{officer.get('full_name') or '-'} ({officer.get('badge_number') or '(badge not set)'})"),
-            _c("Invest ID# / Name", f"{officer.get('badge_number') or '(badge not set)'} - {officer.get('full_name') or '-'}"),
-            _c("Supervisor", "_______________________________")
-        ],
-        [
-            _c("Case Status", "Closed By Investigation"),
-            _c("Case Disposition / Date", f"8 / {reported_dt.split(' ')[0] if reported_dt else '-'}"),
-            _c("Complainant Signature", "_______________________________")
-        ]
-    ]
-    t_footer = Table(footer_data, colWidths=[2.5 * inch, 2.5 * inch, 2.5 * inch])
-    t_footer.setStyle(_GRID_STYLE)
-    story.append(t_footer)
+    # 7. Responding Officers & Case Info — Status band on the bottom row
+    t_officers = _simple_grid([[
+        _c("Officer / ID#", f"{officer.get('full_name') or '-'} ({officer.get('badge_number') or '(badge not set)'})"),
+        _c("Invest ID# / Name", f"{officer.get('badge_number') or '(badge not set)'} - {officer.get('full_name') or '-'}"),
+        _c("Supervisor", "_______________________________"),
+    ]], [2.4, 2.4, 2.4])
+    story.append(_banded('', [t_officers]))
+    t_status = _simple_grid([[
+        _c("Complainant Signature", "_______________________________"),
+        _c("Case Status", "Closed By Investigation"),
+        _c("Case Disposition / Date", f"8 / {reported_dt.split(' ')[0] if reported_dt else '-'}"),
+    ]], [2.4, 2.4, 2.4])
+    story.append(_banded('Status', [t_status]))
 
     # 8. Extra Name List Page (If needed)
     if len(victims) > 1 or len(others) > 2:
@@ -438,124 +479,317 @@ def _incident(form_data, narrative, officer):
         ]))
         story.append(t_extra)
 
-    # 9. Narrative Page
+    # 9. Page 2 — drugs / assisting officers / hate-bias (template page 2)
     story.append(PageBreak())
-    
-    narrative_header = [
-        [
-            Paragraph("<b>REPORTING OFFICER NARRATIVE</b>", ParagraphStyle('nh', parent=_TITLE, alignment=TA_CENTER, fontSize=12)),
-            _c("OCA / Case#", case_no)
-        ],
-        [
-            _c("Victim", v.get('full_name') or '-'),
-            _c("Offense", ', '.join(inc.get('categories', [])) or '-')
-        ],
-        [
-            _c("Date / Time Reported", reported_dt),
-            ""
-        ]
-    ]
-    t_narr_header = Table(narrative_header, colWidths=[5.0 * inch, 2.5 * inch])
-    t_narr_header.setStyle(TableStyle([
+    story.append(Paragraph('<b>INCIDENT/INVESTIGATION REPORT</b>',
+                           ParagraphStyle('p2t', parent=_TITLE, fontSize=12)))
+    story.append(Paragraph(
+        f"<i>{officer.get('department_name') or ''}</i>    Case # {case_no}",
+        ParagraphStyle('p2s', parent=_SMALL, alignment=TA_CENTER)))
+    story.append(Spacer(1, 4))
+
+    drug_legend = ('<font size=5 color="#555555"><b>Status Codes:</b>  1 = None   2 = Burned   '
+                   '3 = Counterfeit / Forged   4 = Damaged / Vandalized   5 = Recovered   '
+                   '6 = Seized   7 = Stolen   8 = Unknown</font>')
+    drug_headers = ['IBR', 'Status', 'Quantity', 'Type Measure', 'Suspected Type']
+    drug_rows = [[Paragraph(drug_legend, _LABEL), '', '', '', '']]
+    drug_rows.append([Paragraph(f'<b>{h}</b>', _LABEL) for h in drug_headers])
+    drugs = form_data.get('drugs', [])
+    for idx in range(max(6, len(drugs))):
+        d_item = drugs[idx] if idx < len(drugs) else {}
+        drug_rows.append([
+            _p_small(d_item.get('ibr', '')),
+            _p_small(d_item.get('status', '')),
+            _p_small(d_item.get('quantity', '')),
+            _p_small(d_item.get('type_measure', '')),
+            _p_small(d_item.get('suspected_type', '')),
+        ])
+    t_drugs = Table(drug_rows, colWidths=[w * inch for w in [0.55, 0.75, 0.95, 1.15, 3.8]])
+    t_drugs.setStyle(TableStyle([
         ('BOX', (0, 0), (-1, -1), 1, colors.black),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('SPAN', (0, 0), (0, 0)),
-        ('SPAN', (1, 1), (1, 2)),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('INNERGRID', (0, 1), (-1, -1), 0.5, colors.black),
+        ('SPAN', (0, 0), (-1, 0)),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
         ('TOPPADDING', (0, 0), (-1, -1), 2),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 3),
+        ('BACKGROUND', (0, 1), (-1, 1), colors.whitesmoke),
     ]))
-    story.append(t_narr_header)
-    story.append(Spacer(1, 6))
+    story.append(_banded('DRUGS', [t_drugs]))
 
-    confidential_style = ParagraphStyle(
-        'Conf', 
-        parent=_styles['BodyText'], 
-        fontSize=8, 
-        fontName='Helvetica-Bold', 
-        textColor=colors.black, 
-        alignment=TA_CENTER
-    )
-    conf_table = Table([[Paragraph("THE INFORMATION BELOW IS CONFIDENTIAL - FOR USE BY AUTHORIZED PERSONNEL ONLY", confidential_style)]], colWidths=[7.5 * inch])
-    conf_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#FFFF00')),
-        ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
+    assisting = form_data.get('assisting_officers', [])
+    if isinstance(assisting, list):
+        assisting = ',  '.join(a for a in assisting if a)
+    t_assist = Table([
+        [_c('Assisting Officers', assisting or '')],
+        [_c('Suspect Hate / Bias Motivated:', form_data.get('hate_bias', '') or '')],
+    ], colWidths=[_INNER_W * inch])
+    t_assist.setStyle(_GRID_STYLE)
+    story.append(_banded('', [t_assist]))
+    story.append(Spacer(1, 10))
+
+    # 10. Narrative continuation — template style: title, "Narr. (cont.) OCA:",
+    #     agency line, then the boxed NARRATIVE section.
+    story.append(Paragraph('<b>INCIDENT/INVESTIGATION REPORT</b>',
+                           ParagraphStyle('nct', parent=_TITLE, fontSize=12)))
+    t_narr_line = Table([[
+        _p_small(f"Narr. (cont.)  OCA: {case_no}"),
+        Paragraph(f"<i>{officer.get('department_name') or ''}</i>",
+                  ParagraphStyle('nca', parent=_SMALL, alignment=TA_CENTER)),
+        '',
+    ]], colWidths=[2.5 * inch, 2.5 * inch, 2.5 * inch])
+    t_narr_line.setStyle(TableStyle([
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
     ]))
-    story.append(conf_table)
-    story.append(Spacer(1, 12))
+    story.append(t_narr_line)
 
+    # A one-cell boxed table can't split across pages (LayoutError on long
+    # narratives), so box only the NARRATIVE label and let the text flow.
+    t_narr_head = Table([[Paragraph('<font size=7>N A R R A T I V E</font>', _LABEL)]],
+                        colWidths=[7.5 * inch])
+    t_narr_head.setStyle(TableStyle([
+        ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    story.append(t_narr_head)
+    story.append(Spacer(1, 8))
     story += _narrative_paragraphs(narrative)
     story += _sig_block(officer)
 
     return story
 
 
-# ── Search warrant ───────────────────────────────────────────────────
-def _search_warrant(form_data, narrative, officer, doc_meta=None):
-    court = form_data.get('court', {})
-    place = form_data.get('place_to_search', {})
-    offenses = form_data.get('offenses', [])
-    items = form_data.get('items_to_seize', [])
+# ── Warrants (non-federal) — the AO 442 / AO 93 template layout drawn with
+#    the agency's admin-configured jurisdiction header (requirement #1/#3).
+#    Federal agencies get the official AO forms instead (see render_pdf).
+_CENTER = ParagraphStyle('LeCenter', parent=_BODY, alignment=TA_CENTER)
+_CAPT = ParagraphStyle('LeSigCaption', parent=_SMALL, alignment=TA_CENTER)
 
-    story = _header(officer)
-    story += _draft_banner(doc_meta)
-    story += [_p('SEARCH AND SEIZURE WARRANT', _TITLE), Spacer(1, 6)]
-    story.append(_kv_table([
-        ('District', court.get('district', '-')),
-        ('Case #', form_data.get('case_number', '-')),
-        ('Judge', court.get('judge_name', '-')),
+
+def _caption_table(left_lines, case_number):
+    """Two-column case caption (parties / matter | Case No.)."""
+    left = [_p(line, _CENTER) for line in left_lines]
+    t = Table(
+        [[left, _p(f"<b>Case No.</b> {case_number or '__________________'}")]],
+        colWidths=[3.6 * inch, 3.0 * inch],
+    )
+    t.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LINEAFTER', (0, 0), (0, 0), 0.75, colors.black),
+        ('LEFTPADDING', (1, 0), (1, 0), 14),
     ]))
-    story += [_p('Offenses', _H)]
-    story += [_p(f"• {o.get('code_section', '')} — {o.get('description', '')}") for o in offenses] or [_p('-')]
-
-    story += [_p('Attachment A — Property to be Searched', _H),
-              _p(place.get('description', '-')),
-              _p(f"Location: {place.get('address', '-')}")]
-
-    story += [_p('Attachment B — Items to be Seized', _H)]
-    story += [_p(f"{chr(97 + i)}. {it}") for i, it in enumerate(items)] or [_p('-')]
-
-    story += [_p('Affidavit — Statement of Probable Cause', _H)] + _narrative_paragraphs(narrative)
-    story += _sig_block(officer, doc_meta)
-    return story
+    return [t, Spacer(1, 10)]
 
 
-# ── Arrest warrant ───────────────────────────────────────────────────
+def _sig_line(left_label, right_caption):
+    t = Table([[
+        _p(f"{left_label} ____________________" if left_label else ''),
+        [_p('_________________________________', _CENTER), _p(f'<i>{right_caption}</i>', _CAPT)],
+    ]], colWidths=[3.2 * inch, 3.5 * inch])
+    t.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+    return [Spacer(1, 14), t]
+
+
+def _checkline(options, selected_key):
+    # Standard PDF fonts have no ☐/☒ glyphs — use [X]/[  ] instead.
+    return _p('&nbsp;&nbsp;&nbsp;'.join(
+        f"[{'X' if key == selected_key else '&nbsp;&nbsp;'}] {label}" for key, label in options))
+
+
+_CHARGING_DOCS_ROW1 = [
+    ('indictment', 'Indictment'),
+    ('superseding_indictment', 'Superseding Indictment'),
+    ('information', 'Information'),
+    ('superseding_information', 'Superseding Information'),
+    ('complaint', 'Complaint'),
+]
+_CHARGING_DOCS_ROW2 = [
+    ('probation_violation', 'Probation Violation Petition'),
+    ('supervised_release_violation', 'Supervised Release Violation Petition'),
+    ('violation_notice', 'Violation Notice'),
+    ('court_order', 'Order of the Court'),
+]
+
+
+def _plaintiff_caption(officer):
+    state = officer.get('agency_state')
+    return f"STATE OF {state.upper()}" if state else 'THE STATE'
+
+
 def _arrest_warrant(form_data, narrative, officer, doc_meta=None):
-    court = form_data.get('court', {})
     defendant = form_data.get('defendant', {})
     offense = form_data.get('offense', {})
     ident = form_data.get('identifiers', {})
+    name = defendant.get('full_name', '')
 
     story = _header(officer)
     story += _draft_banner(doc_meta)
-    story += [_p('ARREST WARRANT', _TITLE), Spacer(1, 6)]
-    story.append(_kv_table([
-        ('District', court.get('district', '-')),
-        ('Case #', form_data.get('case_number', '-')),
-        ('Defendant', defendant.get('full_name', '-')),
-        ('Charging document', form_data.get('charging_document', '-')),
-        ('Offense', f"{offense.get('code_section', '')} — {offense.get('brief_description', '')}"),
-    ]))
+    story += _caption_table(
+        [_plaintiff_caption(officer), 'v.', name or '____________________', '<i>Defendant</i>'],
+        form_data.get('case_number'))
+    story += [_p('<b>ARREST WARRANT</b>', _TITLE), Spacer(1, 6)]
+    story.append(_p('To:&nbsp;&nbsp;&nbsp;&nbsp;Any authorized law enforcement officer'))
+    story.append(Spacer(1, 6))
+    story.append(_p(
+        '<b>YOU ARE COMMANDED</b> to arrest and bring before a judge of this Court without '
+        f"unnecessary delay <i>(name of person to be arrested)</i> {name or '____________________'}, "
+        'who is accused of an offense or violation based on the following document filed with the court:'))
+    story.append(Spacer(1, 4))
+    story.append(_checkline(_CHARGING_DOCS_ROW1, form_data.get('charging_document', '')))
+    story.append(_checkline(_CHARGING_DOCS_ROW2, form_data.get('charging_document', '')))
+    story.append(Spacer(1, 8))
+    story.append(_p('This offense is briefly described as follows:'))
+    story.append(_p(
+        f"{offense.get('code_section', '')}  {offense.get('brief_description', '')}".strip() or '-'))
+    story += _sig_line('Date:', 'Issuing officer’s signature')
+    story += _sig_line('City and state:', 'Printed name and title')
 
-    story += [_p('Defendant Identifiers (Not for Public Disclosure)', _H)]
-    story.append(_kv_table([
-        ('Aliases', ', '.join(ident.get('aliases', [])) or '-'),
-        ('DOB', ident.get('date_of_birth', '-')),
-        ('Sex / Race', f"{ident.get('sex', '-')} / {ident.get('race', '-')}"),
-        ('Height / Weight', f"{ident.get('height', '-')} / {ident.get('weight', '-')}"),
-        ('Last known residence', ident.get('last_known_residence', '-')),
-        ('Vehicle', ident.get('vehicle_description', '-')),
-    ]))
+    return_cell = [
+        _p('<b>Return</b>', _CENTER),
+        _p('This warrant was received on <i>(date)</i> ______________, and the person was '
+           'arrested on <i>(date)</i> ______________ at <i>(city and state)</i> ____________________.'),
+    ] + _sig_line('Date:', 'Arresting officer’s signature') + _sig_line('', 'Printed name and title')
+    t = Table([[return_cell]], colWidths=[6.7 * inch])
+    t.setStyle(TableStyle([('BOX', (0, 0), (-1, -1), 1, colors.black),
+                           ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                           ('RIGHTPADDING', (0, 0), (-1, -1), 8)]))
+    story += [Spacer(1, 16), t]
 
-    if narrative:
-        story += [_p('Supporting Affidavit', _H)] + _narrative_paragraphs(narrative)
+    # Page 2 — sealed personal identifiers (template page 2).
+    story.append(PageBreak())
+    story.append(_p('<b>This second page contains personal identifiers provided for '
+                    'law-enforcement use only and therefore should not be filed in court with '
+                    'the executed warrant unless under seal.</b>', _CENTER))
+    story += [Spacer(1, 6), _p('<i>(Not for Public Disclosure)</i>', _CENTER), Spacer(1, 10)]
+    associates = '; '.join(
+        f"{a.get('name', '')} ({a.get('relation', '')}) {a.get('phone', '')}".strip()
+        for a in ident.get('known_associates', []))
+    blank = '_________________________________'
+    for label, value in [
+        ('Name of defendant/offender', name),
+        ('Known aliases', ', '.join(ident.get('aliases', []))),
+        ('Last known residence', ident.get('last_known_residence', '')),
+        ('Prior addresses to which defendant/offender may still have ties',
+         '; '.join(ident.get('prior_addresses', []))),
+        ('Last known employment', ident.get('last_known_employment', '')),
+        ('Last known telephone numbers', ', '.join(ident.get('phone_numbers', []))),
+        ('Place of birth', ident.get('place_of_birth', '')),
+        ('Date of birth', ident.get('date_of_birth', '')),
+        ('Social Security number', ident.get('ssn', '')),
+        ('Height', ident.get('height', '')),
+        ('Weight', ident.get('weight', '')),
+        ('Sex', ident.get('sex', '')),
+        ('Race', ident.get('race', '')),
+        ('Hair', ident.get('hair', '')),
+        ('Eyes', ident.get('eyes', '')),
+        ('Scars, tattoos, other distinguishing marks', ident.get('distinguishing_marks', '')),
+        ('History of violence, weapons, drug use', ident.get('history_violence_weapons_drugs', '')),
+        ('Known family, friends, and other associates (name, relation, address, phone number)',
+         associates),
+        ('FBI number', ident.get('fbi_number', '')),
+        ('Complete description of auto', ident.get('vehicle_description', '')),
+        ('Investigative agency and address', ident.get('investigative_agency', '')),
+    ]:
+        story.append(_p(f"{label}: {value or blank}"))
+
+    if narrative and narrative.strip():
+        story += [PageBreak(), _p('SUPPORTING AFFIDAVIT', _TITLE), Spacer(1, 8)]
+        story += _narrative_paragraphs(narrative)
+        story += _sig_block(officer, doc_meta)
+    return story
+
+
+def _search_warrant(form_data, narrative, officer, doc_meta=None):
+    place = form_data.get('place_to_search', {})
+    execution = form_data.get('execution', {})
+    court = form_data.get('court', {})
+    judge_title = officer.get('agency_judge_title') or 'Judge'
+    place_lines = [line for line in [place.get('description'), place.get('address')] if line]
+
+    story = _header(officer)
+    story += _draft_banner(doc_meta)
+    story += _caption_table(
+        ['In the Matter of the Search of'] + (place_lines or ['____________________']),
+        form_data.get('case_number'))
+    story += [_p('<b>SEARCH AND SEIZURE WARRANT</b>', _TITLE), Spacer(1, 6)]
+    story.append(_p('To:&nbsp;&nbsp;&nbsp;&nbsp;Any authorized law enforcement officer'))
+    story.append(Spacer(1, 6))
+
+    county = officer.get('agency_county')
+    state = officer.get('agency_state')
+    locality = ', '.join(x for x in [f"{county} County" if county else '', state] if x) \
+        or '____________________'
+    story.append(_p(
+        'An application by a law enforcement officer or an attorney for the government requests '
+        f'the search of the following person or property located in {locality} '
+        '<i>(identify the person or describe the property to be searched and give its location)</i>:'))
+    story.append(_p('See Attachment A.'))
+    story.append(Spacer(1, 8))
+    story.append(_p(
+        'I find that the affidavit(s), or any recorded testimony, establish probable cause to '
+        'search and seize the person or property described above, and that such search will '
+        'reveal <i>(identify the person or describe the property to be seized)</i>:'))
+    story.append(_p('See Attachment B.'))
+    story.append(Spacer(1, 8))
+
+    story.append(_p(
+        '<b>YOU ARE COMMANDED</b> to execute this warrant on or before '
+        f"{execution.get('execute_by_date') or '____________'} <i>(not to exceed 14 days)</i>"))
+    anytime = execution.get('time_window') == 'anytime'
+    story.append(_checkline([
+        ('daytime', 'in the daytime 6:00 a.m. to 10:00 p.m.'),
+        ('anytime', 'at any time in the day or night because good cause has been established.'),
+    ], 'anytime' if anytime else 'daytime'))
+    story.append(Spacer(1, 8))
+    story.append(_p(
+        'Unless delayed notice is authorized below, you must give a copy of the warrant and a '
+        'receipt for the property taken to the person from whom, or from whose premises, the '
+        'property was taken, or leave the copy and receipt at the place where the property was taken.'))
+    story.append(_p(
+        'The officer executing this warrant, or an officer present during the execution of the '
+        'warrant, must prepare an inventory as required by law and promptly return this warrant '
+        f"and inventory to {court.get('judge_name') or '____________________'} <i>({judge_title})</i>."))
+    story += _sig_line('Date and time issued:', 'Judge’s signature')
+    story += _sig_line('City and state:', 'Printed name and title')
+
+    # Page 2 — Return / Certification (template page 2).
+    story.append(PageBreak())
+    return_cell = [_p('<b>Return</b>', _CENTER)]
+    for label, value in [
+        ('Case No.', form_data.get('case_number', '')),
+        ('Date and time warrant executed', ''),
+        ('Copy of warrant and inventory left with', ''),
+        ('Inventory made in the presence of', ''),
+        ('Inventory of the property taken and name of any person(s) seized', ''),
+    ]:
+        return_cell.append(_p(f"{label}: {value or '____________________'}"))
+    return_cell += [
+        Spacer(1, 10),
+        _p('<b>Certification</b>', _CENTER),
+        _p('I declare under penalty of perjury that this inventory is correct and was returned '
+           'along with the original warrant to the designated judge.'),
+    ]
+    return_cell += _sig_line('Date:', 'Executing officer’s signature')
+    return_cell += _sig_line('', 'Printed name and title')
+    t = Table([[return_cell]], colWidths=[6.7 * inch])
+    t.setStyle(TableStyle([('BOX', (0, 0), (-1, -1), 1, colors.black),
+                           ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                           ('RIGHTPADDING', (0, 0), (-1, -1), 8)]))
+    story.append(t)
+
+    # Attachments + affidavit referenced by the face form.
+    story += [
+        PageBreak(), _p('ATTACHMENT A — Property to be Searched', _TITLE), Spacer(1, 8),
+        _p(place.get('description', '-')),
+        _p(f"Location: {place.get('address', '-')}"),
+        PageBreak(), _p('ATTACHMENT B — Items to be Seized', _TITLE), Spacer(1, 8),
+    ]
+    story += [_p(f"{chr(97 + i)}. {it}") for i, it in enumerate(form_data.get('items_to_seize', []))] \
+        or [_p('-')]
+    story += [PageBreak(), _p('AFFIDAVIT — Statement of Probable Cause', _TITLE), Spacer(1, 8)]
+    story += _narrative_paragraphs(narrative)
     story += _sig_block(officer, doc_meta)
     return story
 
@@ -573,7 +807,7 @@ def render_sw_attachments(form_data, narrative, officer, doc_meta=None) -> bytes
     place = form_data.get('place_to_search', {})
     items = form_data.get('items_to_seize', [])
 
-    story = [
+    story = _draft_banner(doc_meta) + [
         _p('ATTACHMENT A — Property to be Searched', _TITLE), Spacer(1, 8),
         _p(place.get('description', '-')),
         _p(f"Location: {place.get('address', '-')}"),
@@ -604,7 +838,7 @@ def render_simple_pdf(title, narrative, officer, doc_meta=None) -> bytes:
         leftMargin=0.9 * inch, rightMargin=0.9 * inch,
         topMargin=0.8 * inch, bottomMargin=0.8 * inch,
     )
-    story = _header(officer) + [_p(title, _TITLE), Spacer(1, 8)]
+    story = _header(officer) + _draft_banner(doc_meta) + [_p(title, _TITLE), Spacer(1, 8)]
     story += _narrative_paragraphs(narrative)
     story += _sig_block(officer, doc_meta)
     doc.build(story)
@@ -612,11 +846,11 @@ def render_simple_pdf(title, narrative, officer, doc_meta=None) -> bytes:
 
 
 def render_pdf(doc_type, form_data, narrative, officer, doc_meta=None) -> bytes:
-    # The official AO-93/AO-442 federal forms are, by definition, FEDERAL forms —
-    # only use them for a federal jurisdiction. A state/municipal agency gets the
-    # custom, agency-aware builder below (STATE OF / COUNTY OF / COURT / AGENCY
-    # header), never the federal face form (requirement: automatic formatting by
-    # jurisdiction level).
+    # Warrants follow the AO 442 / AO 93 template layout (docs/…/Arrest Warrant
+    # Template.pdf, Search Warrant Template.pdf). Federal agencies fill the
+    # official forms themselves; state/municipal agencies get the same layout
+    # drawn with their admin-configured jurisdiction header instead of the
+    # hard-coded federal caption (requirements #1 and #3).
     jurisdiction = (
         form_data.get('court', {}).get('jurisdiction_type_override')
         or officer.get('agency_jurisdiction_type')
@@ -643,7 +877,14 @@ def render_pdf(doc_type, form_data, narrative, officer, doc_meta=None) -> bytes:
         topMargin=margin, bottomMargin=margin,
     )
     if doc_type == 'incident_report':
-        doc.build(builder(form_data, narrative, officer))
+        def _page_num(canvas, _doc):
+            canvas.saveState()
+            canvas.setFont('Helvetica', 7)
+            canvas.drawRightString(letter[0] - 0.5 * inch, 0.3 * inch,
+                                   f"Page {canvas.getPageNumber()}")
+            canvas.restoreState()
+        doc.build(builder(form_data, narrative, officer),
+                  onFirstPage=_page_num, onLaterPages=_page_num)
     else:
         doc.build(builder(form_data, narrative, officer, doc_meta))
     return buf.getvalue()

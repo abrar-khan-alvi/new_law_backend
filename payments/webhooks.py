@@ -9,9 +9,12 @@ import logging
 from datetime import datetime, timezone
 
 from django.conf import settings
+from django.db import IntegrityError, transaction
 
 from accounts.models import User
 from subscriptions.models import Subscription, Plan
+
+from .models import Invoice, Payment, WebhookEvent
 
 logger = logging.getLogger(__name__)
 
@@ -44,18 +47,31 @@ def handle_webhook(payload: bytes, sig_header: str):
     except stripe.error.SignatureVerificationError as exc:
         raise ValueError('Invalid Stripe signature.') from exc
 
+    event_id = event['id']
+    event_type = event['type']
     handler = {
         'checkout.session.completed': _on_checkout_complete,
         'customer.subscription.updated': _on_subscription_updated,
         'customer.subscription.deleted': _on_subscription_cancelled,
         'invoice.payment_succeeded': _on_payment_succeeded,
         'invoice.payment_failed': _on_payment_failed,
-    }.get(event['type'])
+    }.get(event_type)
 
-    if handler:
-        handler(event['data']['object'])
-    else:
-        logger.info('Unhandled Stripe event: %s', event['type'])
+    # The WebhookEvent row is created in the SAME transaction as the handler:
+    # a genuine failure rolls both back (so a legitimate Stripe retry can
+    # still reprocess it), but a Stripe retry of an already-succeeded
+    # delivery hits the unique constraint and is dropped before the handler
+    # ever runs again — e.g. a retried checkout.session.completed can no
+    # longer re-zero documents_generated_this_month for free.
+    try:
+        with transaction.atomic():
+            WebhookEvent.objects.create(stripe_event_id=event_id, event_type=event_type)
+            if handler:
+                handler(event['data']['object'])
+            else:
+                logger.info('Unhandled Stripe event: %s', event_type)
+    except IntegrityError:
+        logger.info('Ignoring duplicate Stripe webhook delivery: %s (%s)', event_id, event_type)
 
 
 def _on_checkout_complete(session):
@@ -133,11 +149,61 @@ def _on_subscription_cancelled(stripe_sub):
         pass
 
 
+def _invoice_user(invoice):
+    sub = Subscription.objects.filter(
+        stripe_customer_id=invoice.get('customer')).select_related('user').first()
+    return sub.user if sub else None
+
+
+def _record_invoice(invoice, user, status: str):
+    Invoice.objects.update_or_create(
+        stripe_invoice_id=invoice['id'],
+        defaults={
+            'user': user,
+            'amount_due': (invoice.get('amount_due') or 0) / 100,
+            'amount_paid': (invoice.get('amount_paid') or 0) / 100,
+            'currency': invoice.get('currency', 'usd'),
+            'status': invoice.get('status') or status,
+            'period_start': _ts(invoice.get('period_start')),
+            'period_end': _ts(invoice.get('period_end')),
+            'hosted_invoice_url': invoice.get('hosted_invoice_url') or '',
+            'invoice_pdf': invoice.get('invoice_pdf') or '',
+        },
+    )
+
+
 def _on_payment_succeeded(invoice):
-    logger.info('Payment succeeded: %s', invoice.get('customer_email'))
+    user = _invoice_user(invoice)
+    if not user:
+        logger.warning(
+            'Payment succeeded for unrecognized Stripe customer=%s (invoice=%s)',
+            invoice.get('customer'), invoice.get('id'),
+        )
+        return
+
+    _record_invoice(invoice, user, status='paid')
+
+    payment_intent_id = invoice.get('payment_intent') or ''
+    if payment_intent_id:
+        Payment.objects.update_or_create(
+            stripe_payment_intent_id=payment_intent_id,
+            defaults={
+                'user': user,
+                'stripe_charge_id': invoice.get('charge') or '',
+                'amount': (invoice.get('amount_paid') or 0) / 100,
+                'currency': invoice.get('currency', 'usd'),
+                'status': Payment.Status.SUCCEEDED,
+                'description': f"Invoice {invoice.get('number') or invoice['id']}",
+            },
+        )
+    logger.info('Payment succeeded: %s (invoice=%s)', user.email, invoice.get('id'))
 
 
 def _on_payment_failed(invoice):
+    user = _invoice_user(invoice)
+    if user:
+        _record_invoice(invoice, user, status='payment_failed')
+
     try:
         sub = Subscription.objects.get(stripe_customer_id=invoice['customer'])
         sub.status = 'past_due'

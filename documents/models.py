@@ -157,6 +157,27 @@ class WarrantTemplate(models.Model):
     class Meta:
         db_table = 'warrant_templates'
         indexes = [models.Index(fields=['doc_type', 'section_key'])]
+        constraints = [
+            # One row per (agency, doc_type, section_key) — otherwise the
+            # resolver's .first() picks an arbitrary one of several rows an
+            # admin edit left behind, and "I edited the template but the
+            # warrant didn't change" becomes unanswerable.
+            models.UniqueConstraint(
+                fields=['agency', 'doc_type', 'section_key'],
+                condition=models.Q(agency__isnull=False),
+                name='unique_warranttemplate_agency_scope',
+            ),
+            models.UniqueConstraint(
+                fields=['jurisdiction_profile', 'doc_type', 'section_key'],
+                condition=models.Q(jurisdiction_profile__isnull=False),
+                name='unique_warranttemplate_jurisdiction_scope',
+            ),
+            models.UniqueConstraint(
+                fields=['doc_type', 'section_key', 'jurisdiction_type'],
+                condition=models.Q(agency__isnull=True, jurisdiction_profile__isnull=True),
+                name='unique_warranttemplate_global_scope',
+            ),
+        ]
 
     def __str__(self):
         scope = self.agency or self.jurisdiction_profile or f'global/{self.jurisdiction_type or "state"}'

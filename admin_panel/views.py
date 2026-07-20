@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count
 from django.utils import timezone
 from rest_framework.response import Response
@@ -9,7 +10,6 @@ from accounts.models import Agency, JurisdictionProfile, User
 from accounts.permissions import IsAdmin
 from accounts.serializers import AgencySerializer, JurisdictionProfileSerializer
 from documents.models import GeneratedDocument
-from documents.serializers import GeneratedDocumentSerializer
 from subscriptions.models import Plan, Subscription
 from subscriptions.serializers import PlanSerializer
 from utils.audit_log import log_event
@@ -26,6 +26,7 @@ from utils.validators import (
 from .models import AuditLog
 from .serializers import (
     AdminDocumentSerializer,
+    AdminGeneratedDocumentSerializer,
     AdminUserSerializer,
     AdminUserUpdateSerializer,
     AuditLogSerializer,
@@ -44,6 +45,10 @@ class PlatformStatsView(APIView):
             'users': {
                 'total': User.objects.count(),
                 'officers': User.objects.filter(role='officer').count(),
+                'admins': User.objects.filter(role='admin').count(),
+                'active_officers': User.objects.filter(role='officer', is_active=True).count(),
+                'suspended_officers': User.objects.filter(role='officer', is_active=False).count(),
+                'supervisors': User.objects.filter(role='officer', is_supervisor=True).count(),
                 'new_7d': User.objects.filter(created_at__gte=last_7d).count(),
             },
             'documents': {
@@ -118,12 +123,16 @@ class PlanDetailView(APIView):
 class DocumentManagementView(APIView):
     """
     GET /api/admin-panel/documents/ — every officer's documents (paginated).
-    Filters: ?q=<user email>, ?doc_type=, ?status=, ?flagged=true (leak_flags only).
+    Filters: ?q=<user email>, ?doc_type=, ?status=, ?review_status=,
+    ?flagged=true (leak_flags/quality_flags), ?pending_review=true (shortcut
+    for review_status in (pending_supervisor, pending_prosecutor) — the admin
+    panel's review queue, since review_status wasn't previously surfaced or
+    filterable here at all, only visible one document at a time).
     """
     permission_classes = [IsAdmin]
 
     def get(self, request):
-        qs = GeneratedDocument.objects.select_related('user').all()
+        qs = GeneratedDocument.objects.select_related('user', 'user__agency').all()
         q = request.GET.get('q')
         if q:
             qs = qs.filter(user__email__icontains=q)
@@ -133,6 +142,14 @@ class DocumentManagementView(APIView):
         status_f = request.GET.get('status')
         if status_f:
             qs = qs.filter(status=status_f)
+        review_status_f = request.GET.get('review_status')
+        if review_status_f:
+            qs = qs.filter(review_status=review_status_f)
+        if str(request.GET.get('pending_review', '')).lower() in ('true', '1'):
+            qs = qs.filter(review_status__in=[
+                GeneratedDocument.ReviewStatus.PENDING_SUPERVISOR,
+                GeneratedDocument.ReviewStatus.PENDING_PROSECUTOR,
+            ])
         if str(request.GET.get('flagged', '')).lower() in ('true', '1'):
             from django.db.models import Q
             qs = qs.exclude(Q(leak_flags=[]) & Q(quality_flags=[]))
@@ -146,24 +163,37 @@ class DocumentDetailAdminView(APIView):
     permission_classes = [IsAdmin]
 
     def get(self, request, pk):
-        doc = GeneratedDocument.objects.filter(pk=pk).first()
+        doc = GeneratedDocument.objects.select_related('user', 'user__agency').filter(pk=pk).first()
         if not doc:
             return Response({'error': {'detail': 'Document not found.'}}, status=404)
-        return Response(GeneratedDocumentSerializer(doc).data)
+        return Response(AdminGeneratedDocumentSerializer(doc).data)
 
 
 class UserManagementView(APIView):
-    """GET /api/admin-panel/users/ — list (paginated, searchable by ?q=)."""
+    """
+    GET /api/admin-panel/users/ — list (paginated, searchable by ?q=).
+    Filters: ?role=, ?exclude_role= (e.g. exclude_role=admin for an
+    officers-only directory), ?is_active=true|false, ?is_supervisor=true|false.
+    """
     permission_classes = [IsAdmin]
 
     def get(self, request):
-        qs = User.objects.select_related('subscription__plan').all()
+        qs = User.objects.select_related('subscription__plan', 'agency').all()
         q = request.GET.get('q')
         if q:
             qs = qs.filter(email__icontains=q)
         role = request.GET.get('role')
         if role:
             qs = qs.filter(role=role)
+        exclude_role = request.GET.get('exclude_role')
+        if exclude_role:
+            qs = qs.exclude(role=exclude_role)
+        is_active = request.GET.get('is_active')
+        if is_active is not None and is_active != '':
+            qs = qs.filter(is_active=is_active.lower() in ('true', '1'))
+        is_supervisor = request.GET.get('is_supervisor')
+        if is_supervisor is not None and is_supervisor != '':
+            qs = qs.filter(is_supervisor=is_supervisor.lower() in ('true', '1'))
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
         return paginator.get_paginated_response(AdminUserSerializer(page, many=True).data)
@@ -261,6 +291,12 @@ class JurisdictionProfileDetailView(APIView):
                 {'error': {'detail': 'Cannot delete a jurisdiction profile with agencies attached.'}},
                 status=400,
             )
+        if profile.warrant_templates.exists():
+            return Response(
+                {'error': {'detail': 'Cannot delete a jurisdiction profile with custom warrant '
+                                      'templates attached. Remove or reassign its templates first.'}},
+                status=400,
+            )
         profile_name = profile.name
         profile.delete()
         log_event(request.user, 'admin.jurisdiction_profile.delete', severity='warning', name=profile_name)
@@ -345,8 +381,10 @@ class AgencySealUploadView(APIView):
             validate_file_size(file_obj, MAX_IMAGE_SIZE)
             ext = validate_file_extension(file_obj, ALLOWED_IMAGE_EXTENSIONS)
             validate_file_signature(file_obj, EXT_TO_MIME[ext])
-        except Exception as e:  # noqa: BLE001 — ValidationError, message already user-facing
-            return Response({'error': {'detail': str(e)}}, status=400)
+        except DjangoValidationError as e:
+            # ValidationError.__str__ renders as a Python list repr
+            # (e.g. "['File too large...']") — e.messages gives clean text.
+            return Response({'error': {'detail': '; '.join(e.messages)}}, status=400)
 
         from utils.storage import store_upload
         key = f'agency_seals/{agency.id}{ext}'
