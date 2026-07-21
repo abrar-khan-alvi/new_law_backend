@@ -77,22 +77,13 @@ class ModelClient:
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID or None,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY or None,
         )
-        # Llama 3 chat format
-        formatted = (
-            "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n"
-            f"{prompt}<|eot_id|>"
-            "<|start_header_id|>assistant<|end_header_id|>\n"
-        )
-        response = client.invoke_model(
+        response = client.converse(
             modelId=settings.BEDROCK_MODEL_ID,
-            contentType='application/json',
-            accept='application/json',
-            body=json.dumps({
-                'prompt': formatted,
-                'max_gen_len': max_tokens,
+            messages=[{'role': 'user', 'content': [{'text': prompt}]}],
+            inferenceConfig={
+                'maxTokens': max_tokens,
                 'temperature': temperature,
-                'top_p': 0.9,
-            }),
+                'topP': 0.9
+            }
         )
-        result = json.loads(response['body'].read())
-        return result.get('generation', '').strip()
+        return response['output']['message']['content'][0]['text'].strip()
