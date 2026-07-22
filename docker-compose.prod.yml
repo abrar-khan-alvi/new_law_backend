@@ -25,13 +25,18 @@ services:
     restart: always
     volumes:
       - ollama_data:/root/.ollama
+    # libggml-cpu-sapphirerapids.so (the AMX backend) segfaults on this instance's
+    # CPU — remove it on every start so Ollama falls back to a non-AMX CPU variant.
+    entrypoint: ["sh", "-c"]
+    command:
+      - "rm -f /usr/lib/ollama/libggml-cpu-sapphirerapids.so; exec /bin/ollama serve"
 
   ollama-pull-model:
     image: ollama/ollama
     environment:
       - OLLAMA_HOST=http://ollama:11434
     entrypoint: /bin/sh
-    command: -c "until ollama list >/dev/null 2>&1; do echo 'Waiting for Ollama to start...'; sleep 2; done && ollama pull llama3.1:8b"
+    command: -c "until ollama list >/dev/null 2>&1; do echo 'Waiting for Ollama to start...'; sleep 2; done && ollama pull llama3.1:8b && ollama pull llama3.2"
     depends_on:
       - ollama
 
