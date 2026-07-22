@@ -123,7 +123,10 @@ def run_generation(doc, narrative_style, temperature=0.2):
     start = time.time()
     client = ModelClient()
     if prompt:
-        ai_text = client.generate(prompt, max_tokens=3000, temperature=temperature)
+        # Ollama on the small prod CPU box (no AMX) runs at only a few tokens/sec —
+        # 3000 tokens there would exceed STUCK_GENERATING_MINUTES before finishing.
+        max_tokens = 1500 if client.mode == 'ollama' else 3000
+        ai_text = client.generate(prompt, max_tokens=max_tokens, temperature=temperature)
         # Strip Markdown / echoed signature blocks the model may add (model-independent).
         ai_text = clean_narrative(ai_text, officer)
     else:
