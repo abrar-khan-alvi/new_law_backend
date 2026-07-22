@@ -112,7 +112,14 @@ class Subscription(models.Model):
     # can't share one counter without one doc type silently eating the
     # other's allowance.
     documents_generated_this_month = models.IntegerField(default=0)  # incident reports
-    warrants_generated_this_month = models.IntegerField(default=0)   # search + arrest, combined
+    warrants_generated_this_month = models.IntegerField(default=0)   # search + arrest, combined —
+    # this is what's actually checked against Plan.warrant_document_limit; kept
+    # unchanged so the tested quota-enforcement logic below is untouched.
+    # Per-type breakdown, display-only — these never gate quota on their own,
+    # they just mirror which of the two warrant types the combined count above
+    # came from, so the UI can show "N search / M arrest" instead of one blob.
+    search_warrants_generated_this_month = models.IntegerField(default=0)
+    arrest_warrants_generated_this_month = models.IntegerField(default=0)
     usage_reset_date = models.DateField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -128,12 +135,21 @@ class Subscription(models.Model):
         """Called by the Celery beat task on the 1st of each month (Phase 5)."""
         self.documents_generated_this_month = 0
         self.warrants_generated_this_month = 0
+        self.search_warrants_generated_this_month = 0
+        self.arrest_warrants_generated_this_month = 0
         self.usage_reset_date = timezone.now().date()
         self.save(update_fields=[
-            'documents_generated_this_month', 'warrants_generated_this_month', 'usage_reset_date',
+            'documents_generated_this_month', 'warrants_generated_this_month',
+            'search_warrants_generated_this_month', 'arrest_warrants_generated_this_month',
+            'usage_reset_date',
         ])
 
     _WARRANT_DOC_TYPES = {'search_warrant', 'arrest_warrant'}
+    # doc_type -> its display-only per-type counter field (see field comments above).
+    _WARRANT_SUBCOUNTER = {
+        'search_warrant': 'search_warrants_generated_this_month',
+        'arrest_warrant': 'arrest_warrants_generated_this_month',
+    }
 
     def _quota_field_for(self, doc_type: str):
         """(counter_field_name, limit) for the quota bucket a doc_type draws from."""
@@ -154,20 +170,27 @@ class Subscription(models.Model):
         means unlimited — always reserves without a WHERE condition.
         """
         counter_field, limit = self._quota_field_for(doc_type)
+        sub_field = self._WARRANT_SUBCOUNTER.get(doc_type)
         qs = Subscription.objects.filter(pk=self.pk)
         if limit is not None:
             qs = qs.filter(**{f'{counter_field}__lt': limit})
-        updated = qs.update(**{counter_field: models.F(counter_field) + 1})
+        update_kwargs = {counter_field: models.F(counter_field) + 1}
+        if sub_field:
+            update_kwargs[sub_field] = models.F(sub_field) + 1
+        updated = qs.update(**update_kwargs)
         if updated:
-            self.refresh_from_db(fields=[counter_field])
+            self.refresh_from_db(fields=list(update_kwargs))
         return bool(updated)
 
     def release_quota(self, doc_type: str):
         """Undo a reservation from try_reserve_quota() after a failed generation."""
         counter_field, _ = self._quota_field_for(doc_type)
-        Subscription.objects.filter(pk=self.pk).update(
-            **{counter_field: models.F(counter_field) - 1})
-        self.refresh_from_db(fields=[counter_field])
+        sub_field = self._WARRANT_SUBCOUNTER.get(doc_type)
+        update_kwargs = {counter_field: models.F(counter_field) - 1}
+        if sub_field:
+            update_kwargs[sub_field] = models.F(sub_field) - 1
+        Subscription.objects.filter(pk=self.pk).update(**update_kwargs)
+        self.refresh_from_db(fields=list(update_kwargs))
 
 
 class UsageLog(models.Model):

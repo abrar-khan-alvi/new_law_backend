@@ -27,6 +27,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'current_period_start', 'current_period_end', 'trial_end',
             'cancel_at_period_end', 'has_used_trial',
             'documents_generated_this_month', 'warrants_generated_this_month',
+            'search_warrants_generated_this_month', 'arrest_warrants_generated_this_month',
             'usage_reset_date',
             'created_at',
         ]
