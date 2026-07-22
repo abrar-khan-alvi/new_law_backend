@@ -17,7 +17,7 @@ from utils.exceptions import QuotaExceeded
 from utils.pagination import StandardPagination
 
 from .exporters import render_docx, render_pdf
-from .generation import _officer_profile
+from .generation import WARRANT_SECTIONS, _officer_profile
 from .models import GeneratedDocument
 from .serializers import (
     GeneratedDocumentListSerializer,
@@ -272,6 +272,22 @@ class ExportDocumentView(APIView):
                     'detail': f"Your officer profile is missing required information ({', '.join(missing)}) "
                               "needed to export an incident report. Update your profile before exporting.",
                     'code': 'incomplete_officer_profile',
+                }},
+                status=400,
+            )
+
+        # Warrants render a jurisdiction-specific legal header/caption from the
+        # officer's Agency (state, court, judicial district, etc. — see
+        # requirement #1 in the Requirements docx). With no agency assigned,
+        # that header would silently export blank instead of blocking on it —
+        # an admin must assign the officer to an agency first.
+        if doc.doc_type in WARRANT_SECTIONS and not doc.user.agency:
+            return Response(
+                {'error': {
+                    'detail': 'This officer is not assigned to an agency, so the jurisdiction '
+                              'header (state, court, judicial district, etc.) cannot be generated. '
+                              'An admin must assign an agency before this document can be exported.',
+                    'code': 'missing_agency',
                 }},
                 status=400,
             )
