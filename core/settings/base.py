@@ -239,7 +239,7 @@ CSRF_COOKIE_AGE = env.int('CSRF_COOKIE_AGE', default=1209600)  # 14 days
 AI_MODE = env('AI_MODE', default='mock')
 USE_LOCAL_MODEL = env.bool('USE_LOCAL_MODEL', default=True)
 LOCAL_MODEL_URL = env('LOCAL_MODEL_URL', default='http://localhost:11434')
-LOCAL_MODEL_NAME = env('LOCAL_MODEL_NAME', default='llama3.1:8b')
+LOCAL_MODEL_NAME = env('LOCAL_MODEL_NAME', default='llama3.2')
 BEDROCK_MODEL_ID = env('BEDROCK_MODEL_ID', default='')
 BEDROCK_REGION = env('BEDROCK_REGION', default='us-east-1')
 

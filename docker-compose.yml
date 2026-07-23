@@ -25,6 +25,9 @@ services:
     image: ollama/ollama
     ports:
       - "11434:11434"
+    environment:
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_MAX_LOADED_MODELS=1
     volumes:
       - ollama_data:/root/.ollama
 
@@ -33,7 +36,8 @@ services:
     environment:
       - OLLAMA_HOST=http://ollama:11434
     entrypoint: /bin/sh
-    command: -c "until ollama list >/dev/null 2>&1; do echo 'Waiting for Ollama to start...'; sleep 2; done && ollama pull llama3.1:8b"
+    # llama3.2 matches LOCAL_MODEL_NAME in .env — keep dev in sync with prod.
+    command: -c "until ollama list >/dev/null 2>&1; do echo 'Waiting for Ollama to start...'; sleep 2; done && ollama pull llama3.2"
     depends_on:
       - ollama
 
@@ -71,7 +75,7 @@ services:
 
   celery:
     build: .
-    command: celery -A core worker --loglevel=info
+    command: celery -A core worker --loglevel=info --concurrency=1
     volumes:
       - .:/app
     env_file: .env

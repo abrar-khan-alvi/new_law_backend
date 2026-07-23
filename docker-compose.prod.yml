@@ -23,6 +23,11 @@ services:
   ollama:
     image: ollama/ollama
     restart: always
+    environment:
+      # This box has 2 vCPUs — never let Ollama try to serve more than one
+      # generation at a time or keep more than one model resident in RAM.
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_MAX_LOADED_MODELS=1
     volumes:
       - ollama_data:/root/.ollama
     # libggml-cpu-sapphirerapids.so (the AMX backend) segfaults on this instance's
@@ -36,7 +41,11 @@ services:
     environment:
       - OLLAMA_HOST=http://ollama:11434
     entrypoint: /bin/sh
-    command: -c "until ollama list >/dev/null 2>&1; do echo 'Waiting for Ollama to start...'; sleep 2; done && ollama pull llama3.1:8b && ollama pull llama3.2"
+    # Only llama3.2 is ever used (see LOCAL_MODEL_NAME in .env) — llama3.1:8b was
+    # being pulled needlessly, wasting ~4.7GB disk and risking a silent fallback to
+    # a model this CPU-only box can't run at usable speed if LOCAL_MODEL_NAME is
+    # ever unset (its Django default is llama3.1:8b).
+    command: -c "until ollama list >/dev/null 2>&1; do echo 'Waiting for Ollama to start...'; sleep 2; done && ollama pull llama3.2"
     depends_on:
       - ollama
 
@@ -69,7 +78,11 @@ services:
 
   celery:
     build: .
-    command: celery -A core worker --loglevel=info
+    # --concurrency=1: this box has 2 vCPUs shared with gunicorn, Postgres, and
+    # Ollama itself — running 2+ narrative generations at once (the prefork
+    # default) would have them all fight for the same cores and slow every
+    # request down together instead of queuing cleanly.
+    command: celery -A core worker --loglevel=info --concurrency=1
     env_file: .env
     environment:
       DJANGO_SETTINGS_MODULE: core.settings.production
