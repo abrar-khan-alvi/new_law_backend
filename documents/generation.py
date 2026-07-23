@@ -66,10 +66,10 @@ def _officer_profile(user) -> dict:
             'agency_requires_supervisor_review': agency.requires_supervisor_review,
             'agency_requires_prosecutor_review': agency.requires_prosecutor_review,
         })
-        # Override legacy fields if agency is set
-        profile['department_name'] = agency.name
-        profile['department_state'] = agency.state
-        profile['ori'] = agency.ori
+        # Override legacy fields if agency is set (fallback to user's fields if agency's are blank)
+        profile['department_name'] = agency.name or profile['department_name']
+        profile['department_state'] = agency.state or profile['department_state']
+        profile['ori'] = agency.ori or profile['ori']
 
     return profile
 
