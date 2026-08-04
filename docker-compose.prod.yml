@@ -67,6 +67,8 @@ services:
       LOCAL_MODEL_URL: http://ollama:11434
     expose:
       - "8000"
+    volumes:
+      - media_data:/app/media
     depends_on:
       db:
         condition: service_healthy
@@ -121,6 +123,7 @@ services:
     image: nginx:alpine
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - media_data:/app/media:ro
     ports:
       - "80:80"
     depends_on:
@@ -130,3 +133,4 @@ services:
 volumes:
   postgres_data:
   ollama_data:
+  media_data:
