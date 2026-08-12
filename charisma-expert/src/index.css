@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    @apply text-gray-900 bg-white;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-navy-800 text-white px-6 py-3 rounded-lg font-semibold hover:bg-navy-700 transition-colors duration-200;
+  }
+
+  .btn-outline {
+    @apply border-2 border-navy-800 text-navy-800 px-6 py-3 rounded-lg font-semibold hover:bg-navy-800 hover:text-white transition-colors duration-200;
+  }
+
+  .btn-blue-gradient {
+    @apply text-white font-semibold px-6 py-3 rounded-xl transition-opacity duration-200 hover:opacity-90;
+    background: linear-gradient(135deg, #93c5fd 0%, #2563eb 100%);
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 bg-gray-100 rounded-xl border-0 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200;
+  }
+
+  .nav-link {
+    @apply text-gray-700 hover:text-navy-800 font-medium transition-colors duration-150 text-sm;
+  }
+
+  .nav-link-active {
+    @apply text-navy-800 font-semibold text-sm;
+  }
+
+  .card {
+    @apply bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+
+  .section-tag {
+    @apply text-xs font-semibold tracking-widest uppercase;
+  }
+
+  /* Auth modal overlay */
+  .auth-overlay {
+    @apply fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm;
+  }
+
+  .auth-modal {
+    @apply bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-10 relative;
+  }
+
+  /* OTP input */
+  .otp-input {
+    @apply w-14 h-14 text-center text-xl font-semibold bg-gray-100 rounded-2xl border-2 border-transparent focus:outline-none focus:border-blue-400 transition-colors duration-200;
+  }
+}
+
+@layer utilities {
+  .text-gradient-blue {
+    @apply bg-gradient-to-r from-blue-400 to-blue-700 bg-clip-text text-transparent;
+  }
+}
