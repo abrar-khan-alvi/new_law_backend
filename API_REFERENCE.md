@@ -1,4 +1,4 @@
-# API Reference — Law Enforcement Workflow Automation System
+# KLYVOREK API Reference
 
 **Base URL (local Docker):** `http://localhost:8000`
 **Auth:** JWT Bearer. Log in, then send `Authorization: Bearer <access_token>` on protected routes.

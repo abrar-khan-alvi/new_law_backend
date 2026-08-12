@@ -169,6 +169,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ── CORS ─────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = env('CORS_ALLOWED_ORIGINS')
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
+GOOGLE_OAUTH_CLIENT_ID = env('GOOGLE_OAUTH_CLIENT_ID', default='')
 
 # ── Django REST Framework ────────────────────────────────────────────
 REST_FRAMEWORK = {

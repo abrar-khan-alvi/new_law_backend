@@ -20,8 +20,22 @@ from documents.exporters.pdf import render_pdf
 from documents.templates_engine import get_template_text, render_template
 from documents.models import GeneratedDocument, WarrantTemplate
 from documents.views import ExportDocumentView, _officer_profile
+from documents.generation import _default_review_status
 
 User = get_user_model()
+
+
+class NonBlockingReviewWorkflowTests(TestCase):
+    def test_agency_review_preferences_do_not_gate_new_documents(self):
+        agency = Agency.objects.create(
+            name='Optional Review PD', requires_supervisor_review=True,
+            requires_prosecutor_review=True,
+        )
+        for doc_type in ('incident_report', 'search_warrant', 'arrest_warrant'):
+            self.assertEqual(
+                _default_review_status(doc_type, agency),
+                GeneratedDocument.ReviewStatus.NOT_REQUIRED,
+            )
 
 
 class WarrantTemplateResolutionTests(TestCase):
@@ -190,6 +204,9 @@ class IncidentReportExportValidationTests(TestCase):
             can_export_pdf=True, can_export_docx=True,
         )
         self.factory = APIRequestFactory()
+        self.agency = Agency.objects.create(
+            name='Test PD', jurisdiction_type='municipal', ori='TE0000000',
+        )
         self.user = User.objects.create(
             email='incomplete@example.com', role='officer',
         )
@@ -202,7 +219,7 @@ class IncidentReportExportValidationTests(TestCase):
         )
 
     def _export(self):
-        req = self.factory.post(f'/api/documents/{self.doc.id}/export/', {'format': 'pdf'}, format='json')
+        req = self.factory.post(f'/api/documents/{self.doc.id}/export/', {'format': 'pdf', 'review_acknowledged': True}, format='json')
         force_authenticate(req, user=self.user)
         return ExportDocumentView.as_view()(req, pk=self.doc.id)
 
@@ -213,25 +230,46 @@ class IncidentReportExportValidationTests(TestCase):
         self.assertEqual(resp.data['error']['code'], 'incomplete_officer_profile')
 
     def test_allows_export_once_profile_is_complete(self):
-        self.user.department_name = 'Test PD'
-        self.user.ori = 'TE0000000'
+        self.user.first_name = 'Test'
+        self.user.last_name = 'Officer'
+        self.user.rank = 'Officer'
         self.user.badge_number = 'T-001'
+        self.user.agency = self.agency
         self.user.save()
         resp = self._export()
         self.assertEqual(resp.status_code, 200)
 
-    def test_only_incident_reports_are_gated(self):
-        # A warrant with the same blank profile must not be blocked by this check.
+    def test_all_document_types_require_profile_and_agency(self):
         warrant = GeneratedDocument.objects.create(
             user=self.user, doc_type='search_warrant',
             case_number='LE-TEST2',
             form_data={'offenses': [], 'place_to_search': {'description': 'x'}},
             ai_narrative='A test affidavit.', status=GeneratedDocument.Status.COMPLETED,
         )
-        req = self.factory.post(f'/api/documents/{warrant.id}/export/', {'format': 'pdf'}, format='json')
+        req = self.factory.post(f'/api/documents/{warrant.id}/export/', {'format': 'pdf', 'review_acknowledged': True}, format='json')
         force_authenticate(req, user=self.user)
         resp = ExportDocumentView.as_view()(req, pk=warrant.id)
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.data['error']['code'], 'incomplete_officer_profile')
+
+    @patch('documents.views.render_pdf', return_value=b'%PDF-FAKE')
+    def test_review_status_never_blocks_owner_export(self, _mock_render):
+        self.user.first_name = 'Test'
+        self.user.last_name = 'Officer'
+        self.user.rank = 'Officer'
+        self.user.badge_number = 'T-001'
+        self.user.agency = self.agency
+        self.user.save()
+        for review_status in (
+            GeneratedDocument.ReviewStatus.PENDING_SUPERVISOR,
+            GeneratedDocument.ReviewStatus.PENDING_PROSECUTOR,
+            GeneratedDocument.ReviewStatus.REJECTED,
+            GeneratedDocument.ReviewStatus.APPROVED,
+            GeneratedDocument.ReviewStatus.NOT_REQUIRED,
+        ):
+            self.doc.review_status = review_status
+            self.doc.save(update_fields=['review_status'])
+            self.assertEqual(self._export().status_code, 200, review_status)
 
 
 class AdminExportOnBehalfOfOfficerTests(TestCase):
@@ -243,9 +281,13 @@ class AdminExportOnBehalfOfOfficerTests(TestCase):
 
     def setUp(self):
         self.factory = APIRequestFactory()
+        self.agency = Agency.objects.create(
+            name='Owner PD', jurisdiction_type='municipal', ori='OW0000001',
+        )
         self.owner = User.objects.create(
             email='owner@example.com', role='officer', badge_number='B-1',
-            department_name='Owner PD', ori='OW0000001',
+            department_name='Owner PD', ori='OW0000001', first_name='Owner',
+            last_name='Officer', rank='Officer', agency=self.agency,
         )
         self.other_officer = User.objects.create(email='other@example.com', role='officer')
         self.admin = User.objects.create(email='export-admin@example.com', role='admin')
@@ -256,7 +298,7 @@ class AdminExportOnBehalfOfOfficerTests(TestCase):
         )
 
     def _export_as(self, user):
-        req = self.factory.post(f'/api/documents/{self.doc.id}/export/', {'format': 'pdf'}, format='json')
+        req = self.factory.post(f'/api/documents/{self.doc.id}/export/', {'format': 'pdf', 'review_acknowledged': True}, format='json')
         force_authenticate(req, user=user)
         return ExportDocumentView.as_view()(req, pk=self.doc.id)
 

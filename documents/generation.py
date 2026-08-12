@@ -105,12 +105,7 @@ def _warrant_template_values(doc_type, form_data, officer):
 
 
 def _default_review_status(doc_type, agency):
-    if doc_type not in WARRANT_SECTIONS or not agency:
-        return GeneratedDocument.ReviewStatus.NOT_REQUIRED
-    if agency.requires_supervisor_review:
-        return GeneratedDocument.ReviewStatus.PENDING_SUPERVISOR
-    if agency.requires_prosecutor_review:
-        return GeneratedDocument.ReviewStatus.PENDING_PROSECUTOR
+    """External review is optional oversight, never a generation/export gate."""
     return GeneratedDocument.ReviewStatus.NOT_REQUIRED
 
 

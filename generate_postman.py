@@ -2,7 +2,7 @@ import json
 
 collection = {
     "info": {
-        "name": "Law Enforcement Workflow Automation System",
+        "name": "KLYVOREK API",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "variable": [

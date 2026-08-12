@@ -19,6 +19,7 @@ redis==5.0.7                     # Redis client
 # AUTHENTICATION (Phase 2) — self-hosted JWT (no Firebase)
 PyJWT==2.9.0                     # dependency of simplejwt
 cryptography==43.0.0
+google-auth==2.35.0                # verify Google Identity Services ID tokens
 django-axes==6.5.0               # brute-force login protection
 
 # UTILITIES (lightweight, used early)

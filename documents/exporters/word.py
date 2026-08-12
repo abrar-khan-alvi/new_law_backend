@@ -130,19 +130,10 @@ def _field(doc, label, value=''):
     doc.add_paragraph(f"{label}: {value or '_________________________________'}")
 
 
-_BANNER_LABELS = {
-    'pending_supervisor': 'DRAFT — PENDING SUPERVISOR REVIEW',
-    'pending_prosecutor': 'DRAFT — PENDING PROSECUTOR REVIEW',
-    'rejected': 'DRAFT — REVIEW REJECTED, NOT APPROVED FOR FILING',
-}
-
-
 def _draft_banner(doc, doc_meta):
     if not doc_meta:
         return
-    label = _BANNER_LABELS.get(doc_meta.get('review_status'))
-    if not label:
-        return
+    label = 'OFFICER-REVIEWED DRAFT — VERIFY BEFORE FILING OR OFFICIAL USE'
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = p.add_run(label)

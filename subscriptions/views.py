@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from .models import Plan
 from .serializers import PlanSerializer, SubscriptionSerializer
 
-TRIAL_DAYS = 14
+TRIAL_DAYS = 7
 
 
 class PlanListView(APIView):

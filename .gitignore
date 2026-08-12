@@ -48,5 +48,3 @@ temp_interactive_push.bat
 .gitignore
 docs
 
-# Frontend lives in its own separate git repo (HMZiyad/charisma-expert)
-charisma-expert/

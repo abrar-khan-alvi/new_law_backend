@@ -88,6 +88,12 @@ class GeneratedDocument(models.Model):
     signed_at = models.DateTimeField(null=True, blank=True)
     signed_ip = models.GenericIPAddressField(null=True, blank=True)
 
+    # Officer acknowledgements create an auditable record that the source facts
+    # were authorized and that the final content was reviewed before use.
+    source_acknowledged_at = models.DateTimeField(null=True, blank=True)
+    review_acknowledged_at = models.DateTimeField(null=True, blank=True)
+    review_acknowledged_content_hash = models.CharField(max_length=64, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

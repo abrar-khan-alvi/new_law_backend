@@ -70,7 +70,7 @@ class Agency(models.Model):
         max_length=500, blank=True, help_text='Storage key for the agency seal/logo (utils.storage).'
     )
 
-    # Agency Configuration Wizard — review workflow toggles (requirement #4).
+    # Optional oversight tracking. These settings never gate generation/export.
     requires_supervisor_review = models.BooleanField(default=False)
     requires_prosecutor_review = models.BooleanField(default=False)
 

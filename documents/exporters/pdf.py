@@ -88,21 +88,11 @@ def _header(officer):
         return flow
 
 
-_BANNER_LABELS = {
-    'pending_supervisor': 'DRAFT — PENDING SUPERVISOR REVIEW',
-    'pending_prosecutor': 'DRAFT — PENDING PROSECUTOR REVIEW',
-    'rejected': 'DRAFT — REVIEW REJECTED, NOT APPROVED FOR FILING',
-}
-
-
 def _draft_banner(doc_meta):
-    """"Generate a clean draft for supervisor or prosecutor review before
-    judicial submission" — a visible banner while review is outstanding."""
+    """External approval is optional; every export already has officer attestation."""
     if not doc_meta:
         return []
-    label = _BANNER_LABELS.get(doc_meta.get('review_status'))
-    if not label:
-        return []
+    label = 'OFFICER-REVIEWED DRAFT — VERIFY BEFORE FILING OR OFFICIAL USE'
     banner_style = ParagraphStyle(
         'draft', parent=_BODY, alignment=TA_CENTER, textColor=colors.red, fontName='Helvetica-Bold',
     )

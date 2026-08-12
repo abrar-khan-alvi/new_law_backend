@@ -19,6 +19,8 @@ class GeneratedDocumentSerializer(serializers.ModelSerializer):
             'supervisor_notes', 'prosecutor_reviewed_name', 'prosecutor_reviewed_at',
             'prosecutor_approved', 'prosecutor_notes',
             'signature_name', 'signed_at',
+            'source_acknowledged_at', 'review_acknowledged_at',
+            'review_acknowledged_content_hash',
             'created_at', 'updated_at',
         ]
         read_only_fields = fields
@@ -40,6 +42,7 @@ class GenerateRequestSerializer(serializers.Serializer):
         default=GeneratedDocument.NarrativeStyle.FIRST_PERSON,
     )
     form_data = serializers.JSONField()
+    source_facts_acknowledged = serializers.BooleanField(write_only=True)
 
     # Minimal per-doc_type required-field checks (see docs/FORM_DATA_SCHEMAS.md).
     REQUIRED = {
@@ -54,6 +57,11 @@ class GenerateRequestSerializer(serializers.Serializer):
         return value
 
     def validate(self, attrs):
+        if not attrs.get('source_facts_acknowledged'):
+            raise serializers.ValidationError({
+                'source_facts_acknowledged':
+                    'You must confirm the facts are accurate and authorized for use.'
+            })
         check = self.REQUIRED.get(attrs['doc_type'])
         if check and not check(attrs['form_data']):
             raise serializers.ValidationError(

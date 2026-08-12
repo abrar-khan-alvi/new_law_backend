@@ -1,4 +1,4 @@
-# Law Backend — Project Analysis Report
+# KLYVOREK Backend — Project Analysis Report
 
 **Repo:** `law_backend` (branch `ziyad`) · Django 5.0.6
 **Generated:** 2026-07-16

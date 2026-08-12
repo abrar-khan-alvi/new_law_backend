@@ -30,7 +30,7 @@ def _default_plans() -> list:
             'description': ('Try every document type — 5 incident reports, 2 search warrants, and '
                             '2 arrest warrants per month, PDF export only.'),
             'price_monthly': 0, 'price_yearly': 0,
-            'document_limit': 5,
+            'document_limit': 7,
             'warrant_document_limit': 2,
             'can_incident_report': True,
             'can_search_warrant': True,
@@ -44,7 +44,7 @@ def _default_plans() -> list:
         },
         {
             'name': 'standard',
-            'display_name': 'Standard',
+            'display_name': 'Plus',
             'description': ('All document types with editable DOCX export. 50 incident reports per '
                             'month — search and arrest warrants are never capped, because a court '
                             'deadline shouldn\'t wait on a subscription tier.'),

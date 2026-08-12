@@ -1,6 +1,6 @@
-# law_backend
+# KLYVOREK Backend
 
-Law Enforcement Workflow Automation System — Django REST backend.
+KLYVOREK — Django REST backend for AI-assisted law-enforcement documentation.
 
 Secure, AI-assisted document generation (incident reports, search warrants,
 arrest warrants) with subscriptions, a blog/media module, and an admin panel.

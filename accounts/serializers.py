@@ -57,6 +57,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     subscription = SubscriptionBriefSerializer(read_only=True)
     full_name = serializers.ReadOnlyField()
     agency = AgencySerializer(read_only=True)
+    export_readiness = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -65,11 +66,24 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'role', 'agency', 'badge_number', 'department_name', 'department_address',
             'department_state', 'ori', 'phone_number', 'rank', 'division',
             'email_verified', 'is_supervisor', 'subscription',
+            'export_readiness',
             'last_active', 'created_at',
         ]
         read_only_fields = [
             'id', 'email', 'role', 'email_verified', 'is_supervisor', 'created_at',
         ]
+
+    def get_export_readiness(self, obj):
+        required = [
+            ('first_name', 'first name'), ('last_name', 'last name'),
+            ('badge_number', 'badge number'), ('rank', 'rank or title'),
+        ]
+        missing = [label for field, label in required if not getattr(obj, field, '').strip()]
+        if missing:
+            return {'ready': False, 'status': 'profile_incomplete', 'missing_fields': missing}
+        if not obj.agency_id:
+            return {'ready': False, 'status': 'agency_assignment_pending', 'missing_fields': []}
+        return {'ready': True, 'status': 'ready_for_export', 'missing_fields': []}
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):

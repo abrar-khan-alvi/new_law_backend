@@ -46,6 +46,7 @@ class GenerateDocumentAsyncTests(TestCase):
         req = self.factory.post('/api/documents/generate/', {
             'doc_type': 'incident_report', 'narrative_style': 'first_person',
             'form_data': {'facts': {'what': 'theft'}},
+            'source_facts_acknowledged': True,
         }, format='json')
         force_authenticate(req, user=self.user)
         resp = GenerateDocumentView.as_view()(req)
@@ -66,6 +67,7 @@ class GenerateDocumentAsyncTests(TestCase):
         req = self.factory.post('/api/documents/generate/', {
             'doc_type': 'incident_report', 'narrative_style': 'first_person',
             'form_data': {'facts': {'what': 'theft'}},
+            'source_facts_acknowledged': True,
         }, format='json')
         force_authenticate(req, user=self.user)
         resp = GenerateDocumentView.as_view()(req)

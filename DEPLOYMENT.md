@@ -41,7 +41,20 @@ before building for production:
 
 ```
 VITE_API_BASE_URL=https://api.aiforlawenforcement.tech
+VITE_GOOGLE_CLIENT_ID=your-google-web-client-id.apps.googleusercontent.com
 ```
+
+Google sign-in also requires the same Web OAuth client ID in the backend `.env`:
+
+```env
+GOOGLE_OAUTH_CLIENT_ID=your-google-web-client-id.apps.googleusercontent.com
+```
+
+In Google Cloud Console, create a Web application OAuth client and add the exact
+frontend origins used by the application (for example `http://localhost:3000`
+and the production HTTPS domain) under Authorized JavaScript origins. Never put
+a Google client secret in the frontend; this flow uses the public client ID and
+the backend verifies Google's signed ID token.
 
 > Currently set to a placeholder since the backend isn't deployed yet. Rebuild and
 > re-upload once the backend has a real URL.

@@ -1,3 +1,4 @@
+import hashlib
 import shortuuid
 from django.conf import settings
 from django.http import HttpResponse
@@ -121,6 +122,7 @@ class GenerateDocumentView(APIView):
             form_data=form_data,
             narrative_style=narrative_style,
             status=GeneratedDocument.Status.GENERATING,
+            source_acknowledged_at=timezone.now(),
         )
 
         generate_document_task.delay(
@@ -178,10 +180,13 @@ class RegenerateDocumentView(APIView):
         doc.signature_name = ''
         doc.signed_at = None
         doc.signed_ip = None
+        doc.review_acknowledged_at = None
+        doc.review_acknowledged_content_hash = ''
         doc.save(update_fields=[
             'status', 'supervisor_reviewed_by', 'supervisor_reviewed_at', 'supervisor_notes',
             'prosecutor_reviewed_name', 'prosecutor_reviewed_at', 'prosecutor_approved', 'prosecutor_notes',
             'signature_name', 'signed_at', 'signed_ip',
+            'review_acknowledged_at', 'review_acknowledged_content_hash',
         ])
         # Slightly higher temperature for variation on regenerate.
         generate_document_task.delay(
@@ -256,9 +261,30 @@ class ExportDocumentView(APIView):
                 )
 
         narrative = request.data.get('edited_text') or doc.ai_narrative
+        if request.data.get('review_acknowledged') is not True:
+            return Response({'error': {'detail': 'Confirm that you reviewed and verified the final document before export.', 'code': 'review_acknowledgement_required'}}, status=400)
         # Always the document OWNER's identity — an admin exporting on an
         # officer's behalf must not stamp the admin's own badge/ORI onto it.
         officer = _officer_profile(doc.user)
+
+        required_profile_fields = [
+            ('first_name', 'first name'), ('last_name', 'last name'),
+            ('badge_number', 'badge number'), ('rank', 'rank or title'),
+        ]
+        missing_profile = [
+            label for field, label in required_profile_fields
+            if not getattr(doc.user, field, '').strip()
+        ]
+        if missing_profile:
+            return Response({'error': {
+                'detail': f"Complete your officer profile before export. Missing: {', '.join(missing_profile)}.",
+                'code': 'incomplete_officer_profile', 'missing_fields': missing_profile,
+            }}, status=400)
+        if not doc.user.agency_id:
+            return Response({'error': {
+                'detail': 'An administrator must assign your account to an agency before export.',
+                'code': 'agency_assignment_required',
+            }}, status=400)
 
         # Never silently substitute another department's identity onto a real
         # filing — require the officer's own profile to be complete instead.
@@ -291,6 +317,10 @@ class ExportDocumentView(APIView):
                 }},
                 status=400,
             )
+
+        doc.review_acknowledged_at = timezone.now()
+        doc.review_acknowledged_content_hash = hashlib.sha256(narrative.encode('utf-8')).hexdigest()
+        doc.save(update_fields=['review_acknowledged_at', 'review_acknowledged_content_hash'])
 
         filename = f"{doc.doc_type}_{doc.case_number or doc.id}".replace(' ', '_')
         doc_meta = {
@@ -424,9 +454,13 @@ class SignDocumentView(APIView):
         full_name = (request.data.get('full_name') or '').strip()
         if not full_name:
             return Response({'error': {'detail': 'full_name is required.'}}, status=400)
+        if request.data.get('review_acknowledged') is not True:
+            return Response({'error': {'detail': 'Confirm that you reviewed and verified the final document before signing.', 'code': 'review_acknowledgement_required'}}, status=400)
+        doc.review_acknowledged_at = timezone.now()
+        doc.review_acknowledged_content_hash = hashlib.sha256(doc.ai_narrative.encode('utf-8')).hexdigest()
 
         doc.signature_name = full_name
         doc.signed_at = timezone.now()
         doc.signed_ip = request.META.get('REMOTE_ADDR')
-        doc.save(update_fields=['signature_name', 'signed_at', 'signed_ip'])
+        doc.save(update_fields=['signature_name', 'signed_at', 'signed_ip', 'review_acknowledged_at', 'review_acknowledged_content_hash'])
         return Response(GeneratedDocumentSerializer(doc).data)

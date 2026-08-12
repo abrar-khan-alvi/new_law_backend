@@ -1,5 +1,6 @@
 from axes.handlers.proxy import AxesProxyHandler
 from django.conf import settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -123,6 +124,62 @@ class LoginView(TokenObtainPairView):
             raise
         log_event(None, 'auth.login', severity='info', email=email)
         return response
+
+
+class GoogleLoginView(APIView):
+    """Exchange a Google Identity Services ID token for the app's JWT pair.
+
+    New accounts are verified officers with no agency. Agency assignment stays
+    exclusively in the admin workflow and is required later for export.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        credential = request.data.get('credential')
+        client_id = settings.GOOGLE_OAUTH_CLIENT_ID
+        if not client_id:
+            return Response({'error': {'detail': 'Google sign-in is not configured.', 'code': 'google_not_configured'}}, status=503)
+        if not credential:
+            return Response({'error': {'detail': 'Google credential is required.'}}, status=400)
+
+        try:
+            from google.auth.transport import requests as google_requests
+            from google.oauth2 import id_token
+            claims = id_token.verify_oauth2_token(
+                credential, google_requests.Request(), client_id,
+            )
+        except (ValueError, TypeError):
+            return Response({'error': {'detail': 'Google could not verify this sign-in.', 'code': 'invalid_google_token'}}, status=400)
+
+        email = (claims.get('email') or '').strip().lower()
+        if not email or not claims.get('email_verified'):
+            return Response({'error': {'detail': 'A verified Google email is required.'}}, status=400)
+
+        user = User.objects.filter(email__iexact=email).first()
+        created = user is None
+        if created:
+            user = User(
+                email=email, role=User.Role.OFFICER, email_verified=True,
+                first_name=(claims.get('given_name') or '')[:150],
+                last_name=(claims.get('family_name') or '')[:150],
+            )
+            user.set_unusable_password()
+            user.save()
+        elif user.role == User.Role.ADMIN:
+            return Response({'error': {'detail': 'Administrators must use the Admin Portal.', 'code': 'admin_google_login_blocked'}}, status=403)
+        elif not user.email_verified:
+            user.email_verified = True
+            user.save(update_fields=['email_verified'])
+
+        user.last_active = timezone.now()
+        user.save(update_fields=['last_active'])
+        refresh = RefreshToken.for_user(user)
+        log_event(user, 'auth.google_login', severity='info', account_created=created)
+        return Response({
+            'access': str(refresh.access_token), 'refresh': str(refresh),
+            'user': UserProfileSerializer(user).data, 'created': created,
+        })
 
 
 class LogoutView(APIView):
