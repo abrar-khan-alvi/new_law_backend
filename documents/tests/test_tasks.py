@@ -32,7 +32,9 @@ def _make_subscribed_user(email, **plan_kwargs):
         **plan_kwargs,
     )
     Subscription.objects.filter(user=user).delete()
-    sub = Subscription.objects.create(user=user, plan=plan, status='active')
+    sub = Subscription.objects.create(
+        user=user, plan=plan, status='active', stripe_subscription_id='sub_test',
+    )
     return user, sub
 
 
@@ -73,6 +75,22 @@ class GenerateDocumentAsyncTests(TestCase):
         resp = GenerateDocumentView.as_view()(req)
 
         self.assertEqual(resp.status_code, 402)  # QuotaExceeded
+        mock_delay.assert_not_called()
+
+    @patch('documents.views.generate_document_task.delay')
+    def test_paid_plan_without_stripe_subscription_cannot_generate(self, mock_delay):
+        self.sub.stripe_subscription_id = ''
+        self.sub.save(update_fields=['stripe_subscription_id'])
+
+        req = self.factory.post('/api/documents/generate/', {
+            'doc_type': 'incident_report', 'narrative_style': 'first_person',
+            'form_data': {'facts': {'what': 'theft'}},
+            'source_facts_acknowledged': True,
+        }, format='json')
+        force_authenticate(req, user=self.user)
+        resp = GenerateDocumentView.as_view()(req)
+
+        self.assertEqual(resp.status_code, 403)
         mock_delay.assert_not_called()
 
 

@@ -92,7 +92,7 @@ class GenerateDocumentView(APIView):
         # ── Plan & quota gating (admins bypass) ──────────────────────
         reserved_quota = False
         if not is_admin:
-            if not sub or sub.status not in ('active', 'trialing'):
+            if not sub or not sub.has_access_entitlement():
                 return Response(
                     {'error': {'detail': 'No active subscription.', 'code': 'no_subscription'}},
                     status=403,
@@ -157,7 +157,7 @@ class RegenerateDocumentView(APIView):
 
         reserved_quota = False
         if not is_admin:
-            if not sub or sub.status not in ('active', 'trialing'):
+            if not sub or not sub.has_access_entitlement():
                 return Response(
                     {'error': {'detail': 'No active subscription.', 'code': 'no_subscription'}},
                     status=403,
@@ -249,7 +249,13 @@ class ExportDocumentView(APIView):
         # Plan-based export gating is based on the REQUESTER's plan (it's
         # their action being metered), not the document owner's.
         if user.role != 'admin' and not getattr(settings, 'DEBUG', False):
-            plan = getattr(getattr(user, 'subscription', None), 'plan', None)
+            sub = getattr(user, 'subscription', None)
+            if not sub or not sub.has_access_entitlement():
+                return Response(
+                    {'error': {'detail': 'No active subscription.', 'code': 'no_subscription'}},
+                    status=403,
+                )
+            plan = sub.plan
             allowed = plan and (
                 plan.can_export_pdf if export_format == 'pdf' else plan.can_export_docx
             )

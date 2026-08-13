@@ -163,6 +163,14 @@ class Subscription(models.Model):
             return 'warrants_generated_this_month', self.plan.warrant_document_limit
         raise ValueError(f'Unrecognized doc_type for quota accounting: {doc_type!r}')
 
+    def has_access_entitlement(self) -> bool:
+        """Free plans are local; paid plans require a live Stripe subscription."""
+        if self.status != self.Status.ACTIVE:
+            return False
+        if self.plan.name == 'free':
+            return True
+        return bool(self.stripe_subscription_id)
+
     def try_reserve_quota(self, doc_type: str) -> bool:
         """
         Atomically increments the counter for this doc_type's quota bucket only

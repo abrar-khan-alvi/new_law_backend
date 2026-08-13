@@ -195,3 +195,27 @@ class StripePriceResolutionTests(TestCase):
         mapping = _price_to_plan()
         self.assertEqual(mapping.get('price_test_monthly'), ('t-stripe', 'monthly'))
         self.assertEqual(mapping.get('price_test_yearly'), ('t-stripe', 'yearly'))
+
+
+class SubscriptionEntitlementTests(TestCase):
+    def test_free_plan_is_entitled_without_stripe(self):
+        user = User.objects.create(email='ent-free@example.com')
+        plan = Plan.objects.create(name='free', display_name='Free')
+        sub = Subscription.objects.create(user=user, plan=plan, status='active')
+        self.assertTrue(sub.has_access_entitlement())
+
+    def test_paid_plan_requires_stripe_subscription(self):
+        user = User.objects.create(email='ent-paid@example.com')
+        plan = Plan.objects.create(name='pro-ent', display_name='Pro')
+        sub = Subscription.objects.create(user=user, plan=plan, status='active')
+        self.assertFalse(sub.has_access_entitlement())
+        sub.stripe_subscription_id = 'sub_test'
+        self.assertTrue(sub.has_access_entitlement())
+
+    def test_trialing_status_is_not_entitled(self):
+        user = User.objects.create(email='ent-trial@example.com')
+        plan = Plan.objects.create(name='trial-ent', display_name='Trial')
+        sub = Subscription.objects.create(
+            user=user, plan=plan, status='trialing', stripe_subscription_id='sub_test',
+        )
+        self.assertFalse(sub.has_access_entitlement())

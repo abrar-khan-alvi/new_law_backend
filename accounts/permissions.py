@@ -30,7 +30,7 @@ class HasActiveSubscription(BasePermission):
         if not request.user.is_authenticated:
             return False
         sub = getattr(request.user, 'subscription', None)
-        return bool(sub and sub.status in ('active', 'trialing') and sub.plan.name != 'free')
+        return bool(sub and sub.plan.name != 'free' and sub.has_access_entitlement())
 
 
 class IsOwnerOrAdmin(BasePermission):

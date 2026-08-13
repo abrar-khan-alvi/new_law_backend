@@ -165,7 +165,7 @@ class User(AbstractUser):
     def has_active_subscription(self):
         # `subscription` relation is added in Step 4; guard until then.
         sub = getattr(self, 'subscription', None)
-        return bool(sub and sub.status in ('active', 'trialing'))
+        return bool(sub and sub.has_access_entitlement())
 
     def can_generate(self, doc_type: str) -> bool:
         """
