@@ -54,7 +54,7 @@ const Billing = () => {
 
   const fetchUsers = (page) => {
     setUsersLoading(true);
-    listAdminUsers({ page })
+    listAdminUsers({ page, exclude_role: 'admin' })
       .then(({ data }) => {
         setUsers(data.results || data);
         setHasMoreUsers(!!data.next);
@@ -239,7 +239,7 @@ const Billing = () => {
               {statsLoading ? (
                 <Loader2 className="animate-spin text-gray-400 h-6 w-6" />
               ) : (
-                stats?.users?.total ?? 0
+                stats?.users?.officers ?? 0
               )}
             </div>
           </div>

@@ -3,7 +3,7 @@ import io
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Pt
+from docx.shared import Pt, RGBColor
 
 
 def _title(doc, text):
@@ -684,11 +684,20 @@ _BUILDERS = {
 }
 
 
-def render_docx(doc_type, form_data, narrative, officer, doc_meta=None) -> io.BytesIO:
+def render_docx(doc_type, form_data, narrative, officer, doc_meta=None, is_test_export=False) -> io.BytesIO:
     builder = _BUILDERS.get(doc_type)
     if builder is None:
         raise ValueError(f'No DOCX template for doc_type {doc_type}')
     doc = Document()
+
+    if is_test_export:
+        p = doc.add_paragraph()
+        run = p.add_run("UNVERIFIED ACCOUNT - TEST USE ONLY")
+        run.bold = True
+        run.font.size = Pt(24)
+        run.font.color.rgb = RGBColor(255, 0, 0)
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
     if doc_type == 'incident_report':
         builder(doc, form_data, narrative, officer)
     else:

@@ -319,40 +319,59 @@ export default function OfficerProfile() {
             </div>
 
             <div className="space-y-4 mb-6">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600 font-medium">Incident Reports</span>
-                  <span className="text-gray-900 font-bold">
-                    {subscription?.documents_generated_this_month || 0} / {formatLimit(plan.document_limit)}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full transition-all"
-                    style={{ width: plan.document_limit == null ? '0%' : `${Math.min((subscription?.documents_generated_this_month || 0) / plan.document_limit * 100, 100)}%` }}
-                  ></div>
-                </div>
-              </div>
-              {(plan.can_search_warrant || plan.can_arrest_warrant) && (
+              {plan.name === 'free' ? (
                 <div>
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600 font-medium">Warrants</span>
+                    <span className="text-gray-600 font-medium">Lifetime Quota</span>
                     <span className="text-gray-900 font-bold">
-                      {subscription?.warrants_generated_this_month || 0} / {formatLimit(plan.warrant_document_limit)}
+                      {(subscription?.documents_generated_this_month || 0) + (subscription?.warrants_generated_this_month || 0)} / {formatLimit(plan.document_limit)}
                     </span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2">
                     <div
                       className="bg-blue-600 h-2 rounded-full transition-all"
-                      style={{ width: plan.warrant_document_limit == null ? '0%' : `${Math.min((subscription?.warrants_generated_this_month || 0) / plan.warrant_document_limit * 100, 100)}%` }}
+                      style={{ width: plan.document_limit == null ? '0%' : `${Math.min((((subscription?.documents_generated_this_month || 0) + (subscription?.warrants_generated_this_month || 0)) / plan.document_limit) * 100, 100)}%` }}
                     ></div>
                   </div>
                 </div>
+              ) : (
+                <>
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-600 font-medium">Incident Reports</span>
+                      <span className="text-gray-900 font-bold">
+                        {subscription?.documents_generated_this_month || 0} / {formatLimit(plan.document_limit)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all"
+                        style={{ width: plan.document_limit == null ? '0%' : `${Math.min((subscription?.documents_generated_this_month || 0) / plan.document_limit * 100, 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  {(plan.can_search_warrant || plan.can_arrest_warrant) && (
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-600 font-medium">Warrants</span>
+                        <span className="text-gray-900 font-bold">
+                          {subscription?.warrants_generated_this_month || 0} / {formatLimit(plan.warrant_document_limit)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all"
+                          style={{ width: plan.warrant_document_limit == null ? '0%' : `${Math.min((subscription?.warrants_generated_this_month || 0) / plan.warrant_document_limit * 100, 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 text-center mt-2">Resets next billing cycle</p>
+                </>
               )}
-              <p className="text-xs text-gray-500 text-center mt-2">Resets next billing cycle</p>
             </div>
 
-            <button onClick={() => navigate('/pricing')} className="w-full py-2.5 bg-gray-900 text-white rounded-lg text-sm font-semibold hover:bg-gray-800 transition-colors">
+            <button onClick={() => navigate('/dashboard/billing')} className="w-full py-2.5 bg-gray-900 text-white rounded-lg text-sm font-semibold hover:bg-gray-800 transition-colors">
               Manage Billing
             </button>
           </div>

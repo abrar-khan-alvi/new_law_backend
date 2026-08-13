@@ -12,19 +12,9 @@ const US_STATES = [
 ]
 
 const initialForm = {
-  first_name: '',
-  last_name: '',
   email: '',
   password: '',
   password2: '',
-  badge_number: '',
-  department_name: '',
-  department_address: '',
-  department_state: '',
-  ori: '',
-  phone_number: '',
-  rank: '',
-  division: '',
 }
 
 const Field = ({ id, name, label, type = 'text', placeholder, required = false, form, errors, handleChange, loading }) => (
@@ -137,12 +127,6 @@ export default function SignUp() {
         <div className="flex items-center gap-3 my-6"><span className="h-px flex-1 bg-gray-200" /><span className="text-xs uppercase text-gray-400">or register with email</span><span className="h-px flex-1 bg-gray-200" /></div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Personal Info */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <Field form={form} errors={errors} handleChange={handleChange} loading={loading} id="signup-first-name" name="first_name" label="First Name" placeholder="Edward" required />
-            <Field form={form} errors={errors} handleChange={handleChange} loading={loading} id="signup-last-name" name="last_name" label="Last Name" placeholder="Brown" required />
-          </div>
-
           <Field form={form} errors={errors} handleChange={handleChange} loading={loading} id="signup-email" name="email" label="Email" type="email" placeholder="officer@dept.gov" required />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -190,38 +174,6 @@ export default function SignUp() {
               </div>
               {errors.password2 && <p className="text-red-500 text-xs mt-1">{errors.password2}</p>}
             </div>
-          </div>
-
-          {/* Officer Details */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <Field form={form} errors={errors} handleChange={handleChange} loading={loading} id="signup-badge" name="badge_number" label="Badge Number" placeholder="2911" required />
-            <Field form={form} errors={errors} handleChange={handleChange} loading={loading} id="signup-phone" name="phone_number" label="Phone Number" type="tel" placeholder="770-426-2911" required />
-            <Field form={form} errors={errors} handleChange={handleChange} loading={loading} id="signup-rank" name="rank" label="Rank / Title" placeholder="Police Officer" required />
-            <Field form={form} errors={errors} handleChange={handleChange} loading={loading} id="signup-division" name="division" label="Division" placeholder="Patrol" />
-          </div>
-
-          {/* Department */}
-          <Field form={form} errors={errors} handleChange={handleChange} loading={loading} id="signup-dept-name" name="department_name" label="Department Name" placeholder="Life University Police Department" required />
-          <Field form={form} errors={errors} handleChange={handleChange} loading={loading} id="signup-dept-address" name="department_address" label="Department Address" placeholder="1269 Barclay Cir SE, Marietta, GA" required />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div>
-              <label htmlFor="signup-dept-state" className="block text-sm font-semibold text-gray-800 mb-2">State *</label>
-              <select
-                id="signup-dept-state"
-                name="department_state"
-                value={form.department_state}
-                onChange={handleChange}
-                className={`input-field ${errors.department_state ? 'border-red-400' : ''}`}
-                required
-                disabled={loading}
-              >
-                <option value="">Select state…</option>
-                {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-              {errors.department_state && <p className="text-red-500 text-xs mt-1">{errors.department_state}</p>}
-            </div>
-            <Field form={form} errors={errors} handleChange={handleChange} loading={loading} id="signup-ori" name="ori" label="ORI Number" placeholder="GA0331100" />
           </div>
 
           <button

@@ -34,6 +34,7 @@ const CreateArrestWarrant = lazy(() => import('./pages/dashboard/CreateArrestWar
 const DocumentHistory = lazy(() => import('./pages/dashboard/DocumentHistory'))
 const GeneratedDocument = lazy(() => import('./pages/dashboard/GeneratedDocument'))
 const OfficerProfile = lazy(() => import('./pages/dashboard/OfficerProfile'))
+const ManageBilling = lazy(() => import('./pages/dashboard/ManageBilling'))
 
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
 const UserManagement = lazy(() => import('./pages/admin/UserManagement'))
@@ -91,6 +92,7 @@ export default function App() {
             <Route path="history" element={<DocumentHistory />} />
             <Route path="document/:id" element={<GeneratedDocument />} />
             <Route path="profile" element={<OfficerProfile />} />
+            <Route path="billing" element={<ManageBilling />} />
           </Route>
 
           {/* Admin Login */}

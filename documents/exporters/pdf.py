@@ -835,7 +835,7 @@ def render_simple_pdf(title, narrative, officer, doc_meta=None) -> bytes:
     return buf.getvalue()
 
 
-def render_pdf(doc_type, form_data, narrative, officer, doc_meta=None) -> bytes:
+def render_pdf(doc_type, form_data, narrative, officer, doc_meta=None, is_test_export=False) -> bytes:
     # Warrants follow the AO 442 / AO 93 template layout (docs/…/Arrest Warrant
     # Template.pdf, Search Warrant Template.pdf). Federal agencies fill the
     # official forms themselves; state/municipal agencies get the same layout
@@ -849,10 +849,10 @@ def render_pdf(doc_type, form_data, narrative, officer, doc_meta=None) -> bytes:
     if jurisdiction == 'federal':
         if doc_type == 'arrest_warrant':
             from .ao_forms import fill_arrest_warrant
-            return fill_arrest_warrant(form_data, narrative, officer, doc_meta)
+            return fill_arrest_warrant(form_data, narrative, officer, doc_meta, is_test_export=is_test_export)
         if doc_type == 'search_warrant':
             from .ao_forms import fill_search_warrant
-            return fill_search_warrant(form_data, narrative, officer, doc_meta)
+            return fill_search_warrant(form_data, narrative, officer, doc_meta, is_test_export=is_test_export)
 
     builder = _BUILDERS.get(doc_type)
     if builder is None:
@@ -872,9 +872,26 @@ def render_pdf(doc_type, form_data, narrative, officer, doc_meta=None) -> bytes:
             canvas.setFont('Helvetica', 7)
             canvas.drawRightString(letter[0] - 0.5 * inch, 0.3 * inch,
                                    f"Page {canvas.getPageNumber()}")
+            if is_test_export:
+                canvas.setFont('Helvetica-Bold', 28)
+                canvas.setFillColor(colors.red, alpha=0.25)
+                canvas.translate(letter[0] / 2, letter[1] / 2)
+                canvas.rotate(45)
+                canvas.drawCentredString(0, 0, "UNVERIFIED ACCOUNT - TEST USE ONLY")
             canvas.restoreState()
         doc.build(builder(form_data, narrative, officer),
                   onFirstPage=_page_num, onLaterPages=_page_num)
     else:
-        doc.build(builder(form_data, narrative, officer, doc_meta))
+        def _watermark_only(canvas, _doc):
+            if is_test_export:
+                canvas.saveState()
+                canvas.setFont('Helvetica-Bold', 28)
+                canvas.setFillColor(colors.red, alpha=0.25)
+                canvas.translate(letter[0] / 2, letter[1] / 2)
+                canvas.rotate(45)
+                canvas.drawCentredString(0, 0, "UNVERIFIED ACCOUNT - TEST USE ONLY")
+                canvas.restoreState()
+                
+        doc.build(builder(form_data, narrative, officer, doc_meta),
+                  onFirstPage=_watermark_only, onLaterPages=_watermark_only)
     return buf.getvalue()

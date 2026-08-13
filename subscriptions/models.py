@@ -133,6 +133,10 @@ class Subscription(models.Model):
 
     def reset_monthly_usage(self):
         """Called by the Celery beat task on the 1st of each month (Phase 5)."""
+        if self.plan.name == 'free':
+            # The free plan has a lifetime quota, so we do not reset it.
+            return
+            
         self.documents_generated_this_month = 0
         self.warrants_generated_this_month = 0
         self.search_warrants_generated_this_month = 0
@@ -172,8 +176,13 @@ class Subscription(models.Model):
         counter_field, limit = self._quota_field_for(doc_type)
         sub_field = self._WARRANT_SUBCOUNTER.get(doc_type)
         qs = Subscription.objects.filter(pk=self.pk)
-        if limit is not None:
+        
+        if self.plan.name == 'free':
+            # For the free plan, the document_limit acts as a global combined limit.
+            qs = qs.alias(total_usage=models.F('documents_generated_this_month') + models.F('warrants_generated_this_month')).filter(total_usage__lt=self.plan.document_limit)
+        elif limit is not None:
             qs = qs.filter(**{f'{counter_field}__lt': limit})
+            
         update_kwargs = {counter_field: models.F(counter_field) + 1}
         if sub_field:
             update_kwargs[sub_field] = models.F(sub_field) + 1

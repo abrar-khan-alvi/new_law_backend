@@ -148,6 +148,7 @@ class GoogleLoginView(APIView):
             from google.oauth2 import id_token
             claims = id_token.verify_oauth2_token(
                 credential, google_requests.Request(), client_id,
+                clock_skew_in_seconds=60
             )
         except (ValueError, TypeError):
             return Response({'error': {'detail': 'Google could not verify this sign-in.', 'code': 'invalid_google_token'}}, status=400)
@@ -270,5 +271,5 @@ class UserListView(APIView):
     permission_classes = [IsAdmin]
 
     def get(self, request):
-        users = User.objects.select_related('subscription__plan').all()
+        users = User.objects.select_related('subscription__plan').exclude(is_superuser=True).all()
         return Response(UserProfileSerializer(users, many=True).data)

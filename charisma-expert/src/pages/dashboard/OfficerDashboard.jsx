@@ -107,24 +107,58 @@ export default function OfficerDashboard() {
                 <span className="text-sm text-gray-500 font-medium">
                   Current Plan: <span className="text-gray-900 font-bold">{planName}</span>
                 </span>
+                {planName === 'Free' && (
+                  <button 
+                    onClick={() => navigate('/dashboard/billing')}
+                    className="text-sm bg-blue-600 text-white font-medium px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Upgrade to Plus
+                  </button>
+                )}
               </div>
-              <div className="flex justify-between items-center text-xs text-gray-500 mb-2 font-medium">
-                <span>
-                  {docsLimit == null ? `${docsUsed} Incident Reports (Unlimited)` : `${docsUsed}/${docsLimit} Incident Reports`}
-                  {' · '}
-                  {`${searchWarrantsUsed} Search Warrants`}
-                  {' · '}
-                  {`${arrestWarrantsUsed} Arrest Warrants`}
-                  {warrantsLimit == null ? ' (Unlimited combined)' : ` (${warrantsUsed}/${warrantsLimit} combined)`}
-                  {' — This Month'}
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-blue-600 h-2 rounded-full transition-all"
-                  style={{ width: `${Math.max(usagePct, warrantsUsagePct)}%` }}
-                ></div>
-              </div>
+              
+              {planName === 'Free' ? (
+                <>
+                  <div className="flex justify-between items-center text-xs text-gray-500 mb-2 font-medium">
+                    <span>
+                      {`${docsUsed + warrantsUsed}/${docsLimit} Total Documents Generated`}
+                      {' · '}
+                      {`${docsUsed} Incident`}
+                      {' · '}
+                      {`${searchWarrantsUsed} Search`}
+                      {' · '}
+                      {`${arrestWarrantsUsed} Arrest`}
+                      {' — Lifetime Limit'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all"
+                      style={{ width: `${Math.min(((docsUsed + warrantsUsed) / (docsLimit || 1)) * 100, 100)}%` }}
+                    ></div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center text-xs text-gray-500 mb-2 font-medium">
+                    <span>
+                      {docsLimit == null ? `${docsUsed} Incident Reports (Unlimited)` : `${docsUsed}/${docsLimit} Incident Reports`}
+                      {' · '}
+                      {`${searchWarrantsUsed} Search Warrants`}
+                      {' · '}
+                      {`${arrestWarrantsUsed} Arrest Warrants`}
+                      {warrantsLimit == null ? ' (Unlimited combined)' : ` (${warrantsUsed}/${warrantsLimit} combined)`}
+                      {' — This Month'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all"
+                      style={{ width: `${Math.max(usagePct, warrantsUsagePct)}%` }}
+                    ></div>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>

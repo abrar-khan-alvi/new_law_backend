@@ -280,11 +280,9 @@ class ExportDocumentView(APIView):
                 'detail': f"Complete your officer profile before export. Missing: {', '.join(missing_profile)}.",
                 'code': 'incomplete_officer_profile', 'missing_fields': missing_profile,
             }}, status=400)
+        is_test_export = False
         if not doc.user.agency_id:
-            return Response({'error': {
-                'detail': 'An administrator must assign your account to an agency before export.',
-                'code': 'agency_assignment_required',
-            }}, status=400)
+            is_test_export = True
 
         # Never silently substitute another department's identity onto a real
         # filing — require the officer's own profile to be complete instead.
@@ -302,22 +300,16 @@ class ExportDocumentView(APIView):
                 status=400,
             )
 
-        # Warrants render a jurisdiction-specific legal header/caption from the
-        # officer's Agency (state, court, judicial district, etc. — see
-        # requirement #1 in the Requirements docx). With no agency assigned,
-        # that header would silently export blank instead of blocking on it —
-        # an admin must assign the officer to an agency first.
-        if doc.doc_type in WARRANT_SECTIONS and not doc.user.agency:
-            return Response(
-                {'error': {
-                    'detail': 'This officer is not assigned to an agency, so the jurisdiction '
-                              'header (state, court, judicial district, etc.) cannot be generated. '
-                              'An admin must assign an agency before this document can be exported.',
-                    'code': 'missing_agency',
-                }},
-                status=400,
-            )
-
+        # For test exports, warrants would crash generating the header without
+        # agency keys. Provide placeholder headers so the document generates successfully.
+        if is_test_export:
+            officer.update({
+                'agency_state': '[TEST STATE]',
+                'agency_county': '[TEST COUNTY]',
+                'agency_court_name': '[TEST COURT]',
+                'agency_judicial_district': '[TEST DISTRICT]',
+                'agency_name': '[UNVERIFIED AGENCY]',
+            })
         doc.review_acknowledged_at = timezone.now()
         doc.review_acknowledged_content_hash = hashlib.sha256(narrative.encode('utf-8')).hexdigest()
         doc.save(update_fields=['review_acknowledged_at', 'review_acknowledged_content_hash'])
@@ -332,12 +324,12 @@ class ExportDocumentView(APIView):
         log_document_export(user, str(doc.id), export_format)
 
         if export_format == 'pdf':
-            content = render_pdf(doc.doc_type, doc.form_data, narrative, officer, doc_meta)
+            content = render_pdf(doc.doc_type, doc.form_data, narrative, officer, doc_meta, is_test_export=is_test_export)
             response = HttpResponse(content, content_type='application/pdf')
             response['Content-Disposition'] = f'attachment; filename="{filename}.pdf"'
             return response
 
-        buf = render_docx(doc.doc_type, doc.form_data, narrative, officer, doc_meta)
+        buf = render_docx(doc.doc_type, doc.form_data, narrative, officer, doc_meta, is_test_export=is_test_export)
         response = HttpResponse(buf.getvalue(), content_type=_DOCX_CONTENT_TYPE)
         response['Content-Disposition'] = f'attachment; filename="{filename}.docx"'
         return response

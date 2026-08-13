@@ -9,6 +9,7 @@ import {
   UserPlus,
   History,
   User,
+  CreditCard,
   LogOut,
   ChevronDown,
   ChevronUp,
@@ -156,6 +157,18 @@ export default function OfficerLayout() {
               >
                 <User size={18} className="mr-3" />
                 Profile Settings
+              </Link>
+            </li>
+
+            <li>
+              <Link 
+                to="/dashboard/billing" 
+                className={`flex items-center px-6 py-3 text-sm transition-colors ${
+                  isActive('/dashboard/billing') ? 'bg-blue-600 text-white' : 'hover:bg-gray-800 hover:text-white'
+                }`}
+              >
+                <CreditCard size={18} className="mr-3" />
+                Manage Billing
               </Link>
             </li>
           </ul>
