@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.utils.text import slugify
 
 from .models import BlogMedia, BlogPost, Tag
 
@@ -24,19 +25,24 @@ class BlogMediaSerializer(serializers.ModelSerializer):
 class BlogPostListSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     cover_image_url = serializers.SerializerMethodField()
-    author_name = serializers.CharField(source='author.full_name', default='', read_only=True)
+    author_name = serializers.SerializerMethodField()
 
     class Meta:
         model = BlogPost
         fields = [
             'id', 'title', 'slug', 'post_type', 'category', 'excerpt',
             'cover_image_url', 'author_name', 'tags', 'is_featured',
-            'view_count', 'like_count', 'published_at', 'created_at',
+            'is_published', 'view_count', 'like_count', 'published_at', 'created_at',
         ]
 
     def get_cover_image_url(self, obj):
         from utils.storage import media_url
         return media_url(obj.cover_image)
+
+    def get_author_name(self, obj):
+        if not obj.author_id or not obj.author:
+            return ''
+        return obj.author.full_name
 
 
 class BlogPostDetailSerializer(BlogPostListSerializer):
@@ -64,7 +70,16 @@ class BlogPostCreateSerializer(serializers.ModelSerializer):
         ]
 
     def _apply_tags(self, post, tag_names):
-        tags = [Tag.objects.get_or_create(name=n.strip())[0] for n in tag_names if n.strip()]
+        tags = []
+        for raw_name in tag_names:
+            name = raw_name.strip()
+            if not name:
+                continue
+            slug = slugify(name)
+            tag = Tag.objects.filter(slug=slug).first()
+            if not tag:
+                tag = Tag.objects.create(name=name, slug=slug)
+            tags.append(tag)
         post.tags.set(tags)
 
     def create(self, validated_data):

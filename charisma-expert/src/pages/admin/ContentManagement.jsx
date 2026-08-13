@@ -6,6 +6,12 @@ import RichTextEditor from '../../components/RichTextEditor';
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const resolveUrl = (url) => url?.startsWith('/') ? `${BASE_URL}${url}` : url;
 const categoryLabel = (category) => String(category || 'general').replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+const apiErrorMessage = (err) => {
+  const data = err.response?.data;
+  if (!data) return err.message || 'Unknown error';
+  if (typeof data === 'string') return data.slice(0, 500);
+  return data.detail || data.error?.detail || JSON.stringify(data);
+};
 
 export default function ContentManagement() {
   const [posts, setPosts] = useState([]);
@@ -138,7 +144,8 @@ export default function ContentManagement() {
       setIsEditorOpen(false);
       fetchPosts();
     } catch (err) {
-      alert('Failed to save post. ' + (err.response?.data?.detail || ''));
+      console.error('Failed to save post', err);
+      alert('Failed to save post. Details: ' + apiErrorMessage(err));
     } finally {
       setSaving(false);
     }
