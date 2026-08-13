@@ -353,7 +353,7 @@ export default function ContentManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Article Content *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Article Content <span className="text-gray-400 font-normal">(optional)</span></label>
                 <RichTextEditor value={formData.content} onChange={content => setFormData({...formData, content})} />
                 <p className="text-xs text-gray-500 mt-2">Format text visually or insert a public image URL. Upload images and videos below to add them to the article gallery.</p>
               </div>
@@ -406,7 +406,7 @@ export default function ContentManagement() {
 
             <div className="px-6 py-4 border-t border-gray-200 shrink-0 flex justify-end gap-3 bg-gray-50/50 rounded-b-xl">
               <button onClick={() => setIsEditorOpen(false)} className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-white transition-colors">Cancel</button>
-              <button onClick={handleSavePost} disabled={saving || !formData.title || !formData.content} className="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">
+              <button onClick={handleSavePost} disabled={saving || !formData.title} className="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">
                 {saving ? 'Saving...' : 'Save Article'}
               </button>
             </div>
