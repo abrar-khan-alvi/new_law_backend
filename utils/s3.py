@@ -27,7 +27,14 @@ def _s3():
 
 
 def s3_configured() -> bool:
-    return bool(settings.AWS_S3_BUCKET)
+    bucket = (settings.AWS_S3_BUCKET or '').strip()
+    if not bucket:
+        return False
+    return not (
+        bucket.startswith('replace-with-')
+        or bucket.startswith('your-')
+        or bucket in {'<private media bucket>', 'your-le-platform-bucket'}
+    )
 
 
 def upload_file_to_s3(file_obj, s3_key: str,
