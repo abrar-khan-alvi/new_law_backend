@@ -1,7 +1,7 @@
 # Klyvorek single-instance deployment
 
 This is the low-cost beta architecture for an ARM64 `t4g.xlarge`. PostgreSQL,
-Redis, Django, Celery, Nginx, and Ollama all run in Docker on the same EC2 host.
+Redis, Django, Celery, the React frontend, Nginx, and Ollama all run in Docker on the same EC2 host.
 The model is `llama3.2:latest`. No RDS or NVIDIA runtime is required.
 
 ## Server installation
@@ -78,7 +78,8 @@ docker compose -f docker-compose.aws.yml exec backend python manage.py createsup
 ```
 
 Create a proxied Cloudflare `A` record: `api` -> the EC2 Elastic IP. Set the
-Cloudflare zone TLS mode to Full (Strict), then verify:
+same proxied `A` record for `www` and the apex (`@`). Set the Cloudflare zone TLS
+mode to Full (Strict), then verify:
 
 ```bash
 curl https://api.klyvorek.com/health/
