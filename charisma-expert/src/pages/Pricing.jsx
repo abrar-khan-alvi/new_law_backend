@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Check, X, Lock, Loader2 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { listPlans, getSubscriptionStatus, startTrial } from '../api/subscriptions'
+import { listPlans } from '../api/subscriptions'
 import { createCheckout } from '../api/payments'
 import { formatLimit } from '../utils/format'
 import { useAuth } from '../contexts/AuthContext'
@@ -13,8 +13,6 @@ export default function Pricing() {
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [subscribingTo, setSubscribingTo] = useState(null)
-  const [subscription, setSubscription] = useState(null)
-  const [startingTrialFor, setStartingTrialFor] = useState(null)
   const { user } = useAuth()
   const navigate = useNavigate()
 
@@ -24,29 +22,6 @@ export default function Pricing() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
-
-  useEffect(() => {
-    if (!user) return
-    getSubscriptionStatus()
-      .then(({ data }) => setSubscription(data))
-      .catch(() => {})
-  }, [user])
-
-  const trialEligible = user && subscription?.plan?.name === 'free' && subscription?.has_used_trial === false
-
-  const handleStartTrial = async (plan) => {
-    setStartingTrialFor(plan.id)
-    try {
-      const { data } = await startTrial(plan.name)
-      setSubscription(data)
-      navigate('/dashboard/profile')
-    } catch (err) {
-      const msg = err?.response?.data?.error?.detail || 'Failed to start trial. Please try again.'
-      alert(msg)
-    } finally {
-      setStartingTrialFor(null)
-    }
-  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -183,16 +158,6 @@ export default function Pricing() {
                     >
                       {subscribingTo === plan.id ? <Loader2 className="animate-spin" size={18} /> : isPopular ? 'Select Plus Plan' : 'Select Plan'}
                     </button>
-
-                    {trialEligible && parseFloat(plan.price_monthly) > 0 && (
-                      <button
-                        onClick={() => handleStartTrial(plan)}
-                        disabled={startingTrialFor === plan.id}
-                        className="w-full mt-3 py-2.5 rounded-xl font-semibold text-sm text-blue-600 hover:text-blue-800 transition-colors flex items-center justify-center disabled:opacity-70"
-                      >
-                        {startingTrialFor === plan.id ? <Loader2 className="animate-spin" size={16} /> : 'Start 7-day free trial'}
-                      </button>
-                    )}
                   </div>
                 )
               })}

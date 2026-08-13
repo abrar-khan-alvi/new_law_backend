@@ -16,6 +16,7 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
+from rest_framework.test import APIClient
 
 from subscriptions.models import Plan, Subscription
 from subscriptions.tasks import expire_trials
@@ -169,6 +170,17 @@ class TrialLifecycleTests(TestCase):
         self.sub.refresh_from_db()
         self.assertEqual(self.sub.plan.name, 'pro')
         self.assertEqual(self.sub.status, 'trialing')
+
+    def test_start_trial_endpoint_does_not_upgrade_without_payment(self):
+        client = APIClient()
+        client.force_authenticate(self.user)
+
+        response = client.post('/api/subscriptions/start-trial/', {'plan': 'pro'}, format='json')
+
+        self.assertEqual(response.status_code, 403)
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.plan.name, 'free')
+        self.assertEqual(self.sub.status, 'active')
 
 
 class StripePriceResolutionTests(TestCase):

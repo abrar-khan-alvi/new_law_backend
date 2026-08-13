@@ -44,6 +44,12 @@ class StartTrialView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        return Response(
+            {'error': {'detail': 'Free trials are disabled. Please complete Stripe checkout to upgrade.',
+                       'code': 'trials_disabled'}},
+            status=403,
+        )
+
         sub = getattr(request.user, 'subscription', None)
         if not sub:
             return Response({'error': {'detail': 'No subscription found.'}}, status=404)
