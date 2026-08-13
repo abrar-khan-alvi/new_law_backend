@@ -86,12 +86,6 @@ export default function Home() {
               >
                 Create My First Report Free
               </Link>
-              <Link
-                to="/about"
-                className="border border-white/40 text-white font-semibold px-7 py-3 rounded-lg hover:bg-white/10 transition-colors"
-              >
-                See How It Works
-              </Link>
             </div>
           </div>
         </div>

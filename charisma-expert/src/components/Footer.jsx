@@ -6,7 +6,6 @@ const footerLinks = {
   Platform: [
     { label: 'Pricing & Plans', to: '/pricing' },
     { label: 'Officer Dashboard', to: '/login' },
-    { label: 'Admin Portal', to: '/login' },
   ],
   Resources: [
     { label: 'Blog & News', to: '/blog' },

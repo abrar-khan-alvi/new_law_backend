@@ -12,8 +12,6 @@ const navLinks = [
   { label: 'About', to: '/about' },
   { label: 'FAQ', to: '/faq' },
   { label: 'Contact', to: '/contact' },
-  { label: 'Privacy', to: '/privacy-policy' },
-  { label: 'Terms', to: '/terms-of-service' },
 ]
 
 export default function Navbar() {
