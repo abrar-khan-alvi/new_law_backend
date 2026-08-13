@@ -106,7 +106,15 @@ class CancelSubscriptionView(APIView):
             sub.status = 'active'
             sub.trial_end = None
             sub.documents_generated_this_month = 0
-            sub.save(update_fields=['plan', 'status', 'trial_end', 'documents_generated_this_month'])
+            sub.warrants_generated_this_month = 0
+            sub.search_warrants_generated_this_month = 0
+            sub.arrest_warrants_generated_this_month = 0
+            sub.usage_reset_date = timezone.now().date()
+            sub.save(update_fields=[
+                'plan', 'status', 'trial_end', 'documents_generated_this_month',
+                'warrants_generated_this_month', 'search_warrants_generated_this_month',
+                'arrest_warrants_generated_this_month', 'usage_reset_date',
+            ])
             return Response({'message': 'Your trial has ended and your account has reverted to Free.'})
 
         if not settings.PAYMENTS_ENABLED:

@@ -16,8 +16,11 @@ staticfiles/
 
 # Environment
 .env
+secrets/
 .env.*
 !.env.example
+!.env.aws.example
+!charisma-expert/.env.production.example
 firebase_credentials.json
 
 # AI / ML

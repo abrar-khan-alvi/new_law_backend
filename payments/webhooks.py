@@ -115,6 +115,8 @@ def _on_checkout_complete(session):
     sub.current_period_end = _ts(stripe_sub['current_period_end'])
     sub.documents_generated_this_month = 0
     sub.warrants_generated_this_month = 0
+    sub.search_warrants_generated_this_month = 0
+    sub.arrest_warrants_generated_this_month = 0
     sub.cancel_at_period_end = False
     sub.save()
     logger.info('Subscription activated: %s → %s', user.email, plan_name)
@@ -138,12 +140,23 @@ def _on_subscription_cancelled(stripe_sub):
     try:
         sub = Subscription.objects.get(stripe_subscription_id=stripe_sub['id'])
         sub.plan = Plan.objects.get(name='free')
-        sub.status = 'cancelled'
+        # The paid Stripe subscription is cancelled, but the local account is
+        # immediately active on Free; a cancelled local status would block all
+        # generation even though the Free plan was assigned.
+        sub.status = 'active'
         sub.cancel_at_period_end = False
         # Clear it — otherwise a future resubscribe attempt would try to
         # modify this now-dead Stripe subscription instead of starting a new one.
         sub.stripe_subscription_id = ''
-        sub.save(update_fields=['plan', 'status', 'cancel_at_period_end', 'stripe_subscription_id'])
+        sub.documents_generated_this_month = 0
+        sub.warrants_generated_this_month = 0
+        sub.search_warrants_generated_this_month = 0
+        sub.arrest_warrants_generated_this_month = 0
+        sub.save(update_fields=[
+            'plan', 'status', 'cancel_at_period_end', 'stripe_subscription_id',
+            'documents_generated_this_month', 'warrants_generated_this_month',
+            'search_warrants_generated_this_month', 'arrest_warrants_generated_this_month',
+        ])
         logger.info('Subscription cancelled: %s', sub.user.email)
     except (Subscription.DoesNotExist, Plan.DoesNotExist):
         pass

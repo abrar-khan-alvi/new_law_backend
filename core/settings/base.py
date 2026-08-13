@@ -141,6 +141,10 @@ else:
             'PASSWORD': env('DB_PASSWORD', default=''),
             'HOST': env('DB_HOST', default='localhost'),
             'PORT': env('DB_PORT', default='5432'),
+            'CONN_MAX_AGE': env.int('DB_CONN_MAX_AGE', default=60),
+            'OPTIONS': {
+                'sslmode': env('DB_SSLMODE', default='prefer'),
+            },
         }
     }
 
@@ -168,6 +172,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ── CORS ─────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = env('CORS_ALLOWED_ORIGINS')
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
 GOOGLE_OAUTH_CLIENT_ID = env('GOOGLE_OAUTH_CLIENT_ID', default='')
 
@@ -241,6 +246,8 @@ AI_MODE = env('AI_MODE', default='mock')
 USE_LOCAL_MODEL = env.bool('USE_LOCAL_MODEL', default=True)
 LOCAL_MODEL_URL = env('LOCAL_MODEL_URL', default='http://localhost:11434')
 LOCAL_MODEL_NAME = env('LOCAL_MODEL_NAME', default='llama3.2')
+OLLAMA_CONTEXT_LENGTH = env.int('OLLAMA_CONTEXT_LENGTH', default=8192)
+OLLAMA_REQUEST_TIMEOUT = env.int('OLLAMA_REQUEST_TIMEOUT', default=300)
 BEDROCK_MODEL_ID = env('BEDROCK_MODEL_ID', default='')
 BEDROCK_REGION = env('BEDROCK_REGION', default='us-east-1')
 

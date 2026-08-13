@@ -21,8 +21,8 @@ class Plan(models.Model):
     # ── Features / limits ───────────────────────────────────────────────
     # Incident reports per month. NULL means unlimited (not a magic-number sentinel).
     document_limit = models.PositiveIntegerField(
-        null=True, blank=True, default=5,
-        help_text='Incident reports per month. Leave blank for unlimited.',
+        null=True, blank=True, default=7,
+        help_text='Incident reports per month (the Free plan uses this as a combined lifetime limit). Leave blank for unlimited.',
     )
     # Search + arrest warrants per month, combined. NULL means unlimited — the
     # policy is that warrant generation is never hard-capped on a paying plan,

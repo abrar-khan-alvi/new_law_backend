@@ -7,6 +7,7 @@ import { listPosts, listTags } from '../api/blog'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const resolveUrl = (url) => url?.startsWith('/') ? `${BASE_URL}${url}` : url;
+const categoryLabel = (category) => String(category || 'general').replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
 
 export default function Blog() {
   const [posts, setPosts] = useState([])
@@ -71,12 +72,6 @@ export default function Blog() {
     });
   }, [posts, mediaMap]);
 
-  const categoryColors = {
-    'AI Technology Integrations': 'bg-gray-900 text-white',
-    'Legal Updates & Policy': 'bg-gray-800 text-white',
-    'Law Enforcement Operations': 'bg-gray-700 text-white',
-  }
-
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -91,7 +86,7 @@ export default function Blog() {
 
       {/* Filters */}
       <section className="bg-white pb-8">
-        <div className="w-full px-6 lg:px-10 xl:px-16">
+        <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             {/* Tag pills */}
             <div className="flex flex-wrap gap-2">
@@ -137,7 +132,7 @@ export default function Blog() {
 
       {/* Articles Grid */}
       <section className="py-8 bg-white flex-1">
-        <div className="w-full px-6 lg:px-10 xl:px-16">
+        <div className="max-w-7xl mx-auto px-6">
           {loading ? (
             <div className="flex justify-center py-20">
               <Loader2 className="animate-spin text-blue-600" size={40} />
@@ -156,8 +151,8 @@ export default function Blog() {
                        <div className="w-full h-full flex items-center justify-center text-gray-400 font-medium bg-gray-100">No Image</div>
                     )}
                     {post.category && (
-                      <span className={`absolute top-3 left-3 text-xs font-semibold px-2.5 py-1 rounded-full ${categoryColors[post.category?.name] || 'bg-gray-800 text-white'} shadow-md`}>
-                        {post.category.name}
+                      <span className="absolute top-3 left-3 text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-900/90 text-white shadow-md backdrop-blur-sm">
+                        {categoryLabel(post.category)}
                       </span>
                     )}
                   </div>

@@ -67,7 +67,10 @@ class BlogPostDetailView(APIView):
         return [AllowAny()] if self.request.method == 'GET' else [IsAdmin()]
 
     def get(self, request, slug):
-        post = get_object_or_404(BlogPost, slug=slug, is_published=True)
+        qs = BlogPost.objects.all()
+        if not (request.user.is_authenticated and request.user.role == 'admin'):
+            qs = qs.filter(is_published=True)
+        post = get_object_or_404(qs, slug=slug)
         BlogPost.objects.filter(pk=post.pk).update(view_count=post.view_count + 1)
         return Response(BlogPostDetailSerializer(post).data)
 
@@ -146,6 +149,9 @@ class BlogMediaUploadView(APIView):
             caption=request.data.get('caption', ''),
             order=request.data.get('order', 0) or 0,
         )
+        if media_type == 'image' and request.data.get('caption') == 'Cover Image':
+            post.cover_image = stored_key
+            post.save(update_fields=['cover_image'])
         post.recalc_post_type()
         return Response(BlogMediaSerializer(media).data, status=201)
 
@@ -174,6 +180,9 @@ class BlogMediaDeleteView(APIView):
     def delete(self, request, slug, media_id):
         post = get_object_or_404(BlogPost, slug=slug)
         media = get_object_or_404(BlogMedia, id=media_id, post=post)
+        if media.s3_key and post.cover_image == media.s3_key:
+            post.cover_image = ''
+            post.save(update_fields=['cover_image'])
         delete_upload(media.s3_key)
         if media.thumbnail_s3_key:
             delete_upload(media.thumbnail_s3_key)

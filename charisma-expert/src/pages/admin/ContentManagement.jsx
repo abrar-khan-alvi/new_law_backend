@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { FileText, Plus, Edit, Trash2, X, UploadCloud, Image as ImageIcon, Video, Eye, Link as LinkIcon, Loader2 } from 'lucide-react';
 import { listPosts, createPost, updatePost, deletePost, getPost, addPostMedia, deletePostMedia } from '../../api/blog';
+import RichTextEditor from '../../components/RichTextEditor';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const resolveUrl = (url) => url?.startsWith('/') ? `${BASE_URL}${url}` : url;
+const categoryLabel = (category) => String(category || 'general').replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
 
 export default function ContentManagement() {
   const [posts, setPosts] = useState([]);
@@ -53,7 +55,7 @@ export default function ContentManagement() {
         setEditingPost(fullPost);
         setFormData({
           title: fullPost.title || '',
-          content: fullPost.content || '',
+          content: fullPost.content_html || fullPost.content || '',
           excerpt: fullPost.excerpt || '',
           category: fullPost.category || 'general',
           tags: fullPost.tags ? fullPost.tags.map(t => t.name).join(', ') : '',
@@ -101,12 +103,10 @@ export default function ContentManagement() {
           coverForm.append('caption', 'Cover Image');
           
           // 1. Upload to the media gallery
-          const coverRes = await addPostMedia(postSlug, coverForm);
+          await addPostMedia(postSlug, coverForm);
           
-          // 2. Patch the post to set this media's URL as the cover_image_url
-          if (coverRes && coverRes.data && coverRes.data.url) {
-            await updatePost(postSlug, { cover_image_url: coverRes.data.url });
-          }
+          // The upload endpoint marks media captioned "Cover Image" as the
+          // post cover, so no second URL patch is required.
         } catch (coverErr) {
           console.error("Cover image upload failed", coverErr);
           alert('Article saved, but cover image upload failed. Details: ' + (coverErr.response?.data ? JSON.stringify(coverErr.response.data) : coverErr.message));
@@ -156,7 +156,7 @@ export default function ContentManagement() {
 
   const togglePublish = async (post) => {
     try {
-      await updatePost(post.slug, { is_published: !post.is_published });
+      await updatePost(post.slug, { publish: !post.is_published });
       fetchPosts();
     } catch (err) {
       alert('Failed to toggle publish status.');
@@ -269,7 +269,7 @@ export default function ContentManagement() {
                       <div className="text-sm font-semibold text-gray-900 max-w-xs truncate" title={post.title}>{post.title}</div>
                       <div className="text-xs text-gray-500 mt-0.5">By {post.author_name || 'Admin'}</div>
                     </td>
-                    <td className="px-6 py-5 whitespace-nowrap text-sm text-gray-500">{post.category?.name || 'Uncategorized'}</td>
+                    <td className="px-6 py-5 whitespace-nowrap text-sm text-gray-500">{categoryLabel(post.category)}</td>
                     <td className="px-6 py-5 whitespace-nowrap">
                       <button 
                         onClick={() => togglePublish(post)}
@@ -346,8 +346,9 @@ export default function ContentManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Article Content (Markdown supported) *</label>
-                <textarea rows={10} value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm" required />
+                <label className="block text-sm font-medium text-gray-700 mb-2">Article Content *</label>
+                <RichTextEditor value={formData.content} onChange={content => setFormData({...formData, content})} />
+                <p className="text-xs text-gray-500 mt-2">Format text visually or insert a public image URL. Upload images and videos below to add them to the article gallery.</p>
               </div>
 
               <div className="flex items-center gap-6 pt-2">

@@ -1,17 +1,26 @@
 import uuid
+import re
 
 import bleach
 import markdown as md
+from bleach.css_sanitizer import CSSSanitizer
 from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
 
 ALLOWED_TAGS = [
-    'p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'blockquote',
+    'p', 'br', 'strong', 'em', 'u', 's', 'a', 'ul', 'ol', 'li', 'blockquote',
     'code', 'pre', 'h1', 'h2', 'h3', 'h4', 'img', 'table', 'thead', 'tbody',
-    'tr', 'th', 'td', 'hr',
+    'tr', 'th', 'td', 'hr', 'figure', 'figcaption', 'video', 'source',
 ]
-ALLOWED_ATTRS = {'a': ['href', 'title', 'rel'], 'img': ['src', 'alt', 'title']}
+ALLOWED_ATTRS = {
+    'a': ['href', 'title', 'rel', 'target'],
+    'img': ['src', 'alt', 'title', 'width', 'height', 'loading'],
+    'video': ['src', 'controls', 'poster', 'preload', 'width', 'height'],
+    'source': ['src', 'type'],
+    'p': ['style'], 'h1': ['style'], 'h2': ['style'], 'h3': ['style'], 'h4': ['style'],
+}
+CSS_SANITIZER = CSSSanitizer(allowed_css_properties=['text-align'])
 
 
 class Tag(models.Model):
@@ -56,7 +65,7 @@ class BlogPost(models.Model):
     post_type = models.CharField(max_length=30, choices=PostType.choices, default=PostType.TEXT)
     category = models.CharField(max_length=30, choices=Category.choices, default=Category.GENERAL)
 
-    content = models.TextField(blank=True)            # markdown source
+    content = models.TextField(blank=True)            # rich HTML or legacy markdown source
     content_html = models.TextField(blank=True)       # rendered + sanitized
     excerpt = models.TextField(blank=True, max_length=500)
     cover_image = models.CharField(max_length=500, blank=True)  # storage key
@@ -101,8 +110,23 @@ class BlogPost(models.Model):
             self.slug = str(self.id)
 
         if self.content:
-            rendered = md.markdown(self.content, extensions=['fenced_code', 'tables', 'nl2br'])
-            self.content_html = bleach.clean(rendered, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS)
+            # New CMS entries are rich HTML. Existing Markdown posts remain
+            # compatible and are converted before applying the same sanitizer.
+            looks_like_html = bool(re.search(
+                r'<\s*(p|h[1-4]|ul|ol|blockquote|figure|img|video)\b',
+                self.content,
+                re.I,
+            ))
+            rendered = self.content if looks_like_html else md.markdown(
+                self.content, extensions=['fenced_code', 'tables', 'nl2br'],
+            )
+            self.content_html = bleach.clean(
+                rendered, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS,
+                protocols={'http', 'https', 'mailto'}, css_sanitizer=CSS_SANITIZER,
+                strip=True,
+            )
+        else:
+            self.content_html = ''
 
         super().save(*args, **kwargs)
 

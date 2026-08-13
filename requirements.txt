@@ -64,6 +64,7 @@ Pillow==10.4.0                   # image support for PDF
 # ffmpeg-python==0.2.0          # needs ffmpeg (video thumbnails deferred)
 stripe==10.7.0                   # payments (code present; activated later via keys)
 bleach==6.1.0                    # sanitize blog HTML
+tinycss2==1.4.0                  # required by Bleach CSSSanitizer for TipTap text alignment
 Markdown==3.6                    # render blog markdown
 
 # ════════════════════════════════════════

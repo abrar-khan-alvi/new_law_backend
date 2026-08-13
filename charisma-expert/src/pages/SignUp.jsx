@@ -4,13 +4,6 @@ import { Eye, EyeOff, X, Loader2 } from 'lucide-react'
 import * as authApi from '../api/auth'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 
-const US_STATES = [
-  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
-  'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
-  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
-  'VA','WA','WV','WI','WY','DC',
-]
-
 const initialForm = {
   email: '',
   password: '',

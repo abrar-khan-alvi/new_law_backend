@@ -27,16 +27,17 @@ def _default_plans() -> list:
         {
             'name': 'free',
             'display_name': 'Free',
-            'description': ('Try every document type — 5 incident reports, 2 search warrants, and '
-                            '2 arrest warrants per month, PDF export only.'),
+            'description': ('Seven AI document generations for the lifetime of the account, combined '
+                            'across incident reports, search warrants, and arrest warrants. PDF and '
+                            'DOCX test exports included.'),
             'price_monthly': 0, 'price_yearly': 0,
             'document_limit': 7,
-            'warrant_document_limit': 2,
+            'warrant_document_limit': 7,
             'can_incident_report': True,
             'can_search_warrant': True,
             'can_arrest_warrant': True,
             'can_export_pdf': True,
-            'can_export_docx': False,
+            'can_export_docx': True,
             'can_save_history': True,
             'support_level': 'community',
             'is_active': True,

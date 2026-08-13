@@ -36,6 +36,23 @@ class DocumentLimitTests(TestCase):
         sub = Subscription.objects.create(user=user, plan=plan, documents_generated_this_month=2)
         self.assertFalse(sub.try_reserve_quota('incident_report'))
 
+    def test_free_plan_has_one_combined_lifetime_quota(self):
+        user = User.objects.create(email='free-lifetime@example.com')
+        plan = Plan.objects.create(
+            name='free', display_name='Free', document_limit=7,
+            warrant_document_limit=7,
+        )
+        sub = Subscription.objects.create(
+            user=user, plan=plan, documents_generated_this_month=5,
+            warrants_generated_this_month=2,
+        )
+        self.assertFalse(sub.try_reserve_quota('incident_report'))
+        self.assertFalse(sub.try_reserve_quota('search_warrant'))
+        sub.reset_monthly_usage()
+        sub.refresh_from_db()
+        self.assertEqual(sub.documents_generated_this_month, 5)
+        self.assertEqual(sub.warrants_generated_this_month, 2)
+
 
 class WarrantQuotaBucketTests(TestCase):
     """Incident reports and warrants must draw from independent buckets."""
@@ -104,7 +121,7 @@ class QuotaAtomicityTests(TestCase):
 class TrialLifecycleTests(TestCase):
     def setUp(self):
         self.user = User.objects.create(email='trial@example.com')
-        self.free = Plan.objects.create(name='free', display_name='Free', document_limit=5)
+        self.free = Plan.objects.create(name='free', display_name='Free', document_limit=7)
         self.pro = Plan.objects.create(name='pro', display_name='Pro', document_limit=None)
         self.sub = Subscription.objects.create(user=self.user, plan=self.free, status='active')
 
@@ -127,12 +144,18 @@ class TrialLifecycleTests(TestCase):
         self.sub.status = 'trialing'
         self.sub.trial_end = timezone.now() - timedelta(days=1)
         self.sub.documents_generated_this_month = 80
+        self.sub.warrants_generated_this_month = 30
+        self.sub.search_warrants_generated_this_month = 20
+        self.sub.arrest_warrants_generated_this_month = 10
         self.sub.save()
 
         expire_trials()
 
         self.sub.refresh_from_db()
         self.assertEqual(self.sub.documents_generated_this_month, 0)
+        self.assertEqual(self.sub.warrants_generated_this_month, 0)
+        self.assertEqual(self.sub.search_warrants_generated_this_month, 0)
+        self.assertEqual(self.sub.arrest_warrants_generated_this_month, 0)
         self.assertTrue(self.sub.try_reserve_quota('incident_report'))
 
     def test_expire_trials_leaves_unexpired_trials_alone(self):

@@ -31,6 +31,14 @@ def expire_trials():
         # quota during a Pro trial would land back on Free already over-limit
         # and be locked out until next month's reset, through no fault of theirs.
         sub.documents_generated_this_month = 0
-        sub.save(update_fields=['plan', 'status', 'trial_end', 'documents_generated_this_month'])
+        sub.warrants_generated_this_month = 0
+        sub.search_warrants_generated_this_month = 0
+        sub.arrest_warrants_generated_this_month = 0
+        sub.usage_reset_date = timezone.now().date()
+        sub.save(update_fields=[
+            'plan', 'status', 'trial_end', 'documents_generated_this_month',
+            'warrants_generated_this_month', 'search_warrants_generated_this_month',
+            'arrest_warrants_generated_this_month', 'usage_reset_date',
+        ])
         count += 1
     return f'Expired {count} trial(s).'

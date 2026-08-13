@@ -224,10 +224,20 @@ class IncidentReportExportValidationTests(TestCase):
         return ExportDocumentView.as_view()(req, pk=self.doc.id)
 
     def test_blocks_export_with_incomplete_profile(self):
-        # No department_name / ori / badge_number set at all.
+        # Once assigned to an agency, official identity fields are mandatory.
+        self.user.agency = self.agency
+        self.user.save(update_fields=['agency'])
         resp = self._export()
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.data['error']['code'], 'incomplete_officer_profile')
+
+    @patch('documents.views.render_pdf', return_value=b'%PDF-FAKE')
+    def test_unassigned_user_can_export_a_watermarked_test_document(self, mock_render):
+        resp = self._export()
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(mock_render.call_args.kwargs['is_test_export'])
+        officer = mock_render.call_args.args[3]
+        self.assertEqual(officer['department_name'], '[UNVERIFIED AGENCY]')
 
     def test_allows_export_once_profile_is_complete(self):
         self.user.first_name = 'Test'
@@ -240,6 +250,8 @@ class IncidentReportExportValidationTests(TestCase):
         self.assertEqual(resp.status_code, 200)
 
     def test_all_document_types_require_profile_and_agency(self):
+        self.user.agency = self.agency
+        self.user.save(update_fields=['agency'])
         warrant = GeneratedDocument.objects.create(
             user=self.user, doc_type='search_warrant',
             case_number='LE-TEST2',

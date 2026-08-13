@@ -57,9 +57,10 @@ class ModelClient:
                     'options': {
                         'temperature': temperature,
                         'num_predict': max_tokens,
+                        'num_ctx': settings.OLLAMA_CONTEXT_LENGTH,
                     },
                 },
-                timeout=180,
+                timeout=settings.OLLAMA_REQUEST_TIMEOUT,
             )
             response.raise_for_status()
             return response.json()['response'].strip()

@@ -113,7 +113,7 @@ export default function Pricing() {
                       <li className="flex items-center gap-3">
                         <Check size={20} className="text-emerald-500 shrink-0" />
                         <span className="text-sm text-gray-700 font-medium">
-                          {plan.name === 'free' ? '7 Total Documents / Month' : `${formatLimit(plan.document_limit)} Incident Reports / Month`}
+                          {plan.name === 'free' ? '7 Document Generations — Lifetime' : `${formatLimit(plan.document_limit)} Incident Reports / Month`}
                         </span>
                       </li>
                       {(plan.can_search_warrant || plan.can_arrest_warrant) && plan.name !== 'free' && (

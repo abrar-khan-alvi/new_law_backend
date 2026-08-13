@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Check, X, Loader2, CreditCard, AlertCircle } from 'lucide-react';
-import { listPlans, getSubscriptionStatus } from '../../api/subscriptions';
+import { cancelSubscription, listPlans, getSubscriptionStatus } from '../../api/subscriptions';
 import { createCheckout } from '../../api/payments';
 import { formatLimit } from '../../utils/format';
-import { useAuth } from '../../contexts/AuthContext';
 
 export default function ManageBilling() {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState(null);
   const [checkoutLoadingFor, setCheckoutLoadingFor] = useState(null);
-  const { user } = useAuth();
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -25,18 +25,27 @@ export default function ManageBilling() {
   }, []);
 
   const handleCheckout = async (plan) => {
+    setMessage('');
+    setError('');
     setCheckoutLoadingFor(plan.id);
     try {
+      if (plan.name === 'free') {
+        const { data } = await cancelSubscription();
+        setMessage(data.message || 'Your subscription cancellation has been scheduled.');
+        const { data: refreshed } = await getSubscriptionStatus();
+        setSubscription(refreshed);
+        return;
+      }
       const { data } = await createCheckout(plan.name, 'monthly');
       if (data.checkout_url) {
         window.location.href = data.checkout_url;
       } else if (data.subscription) {
         // In-place plan change (prorated upgrade/downgrade without new checkout)
         setSubscription(data.subscription);
-        alert(data.message || `Successfully changed plan to ${plan.display_name}.`);
+        setMessage(data.message || `Successfully changed plan to ${plan.display_name}.`);
       }
     } catch (err) {
-      alert(err?.response?.data?.error?.detail || 'Failed to initialize checkout.');
+      setError(err?.response?.data?.error?.detail || 'Unable to update your subscription.');
     } finally {
       setCheckoutLoadingFor(null);
     }
@@ -62,6 +71,9 @@ export default function ManageBilling() {
         <h1 className="text-3xl font-bold text-gray-900 font-serif">Manage Billing</h1>
         <p className="text-gray-500 mt-2">View your current usage and manage your subscription plan.</p>
       </div>
+
+      {message && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>}
+      {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       {/* Current Plan Overview */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -147,7 +159,7 @@ export default function ManageBilling() {
                   <li className="flex items-center gap-3">
                     <Check size={18} className="text-emerald-500 shrink-0" />
                     <span className="text-sm text-gray-700">
-                      {plan.name === 'free' ? '7 Total Documents' : `${formatLimit(plan.document_limit)} Incident Reports / Month`}
+                      {plan.name === 'free' ? '7 Document Generations — Lifetime' : `${formatLimit(plan.document_limit)} Incident Reports / Month`}
                     </span>
                   </li>
                   {(plan.can_search_warrant || plan.can_arrest_warrant) && plan.name !== 'free' && (
@@ -192,7 +204,13 @@ export default function ManageBilling() {
                   }`}
                 >
                   {isProcessing && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {isCurrentPlan ? 'Current Plan' : isProcessing ? 'Processing...' : 'Upgrade to ' + plan.display_name}
+                  {isCurrentPlan
+                    ? 'Current Plan'
+                    : isProcessing
+                    ? 'Processing...'
+                    : plan.name === 'free'
+                    ? 'Downgrade to Free'
+                    : 'Choose ' + plan.display_name}
                 </button>
               </div>
             );

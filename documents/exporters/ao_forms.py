@@ -1,337 +1,138 @@
-"""
-Fill official fillable U.S. court forms (AcroForm field-fill) for court-exact output.
-
-AO 442 (Arrest Warrant) is a fillable AcroForm — we set its named fields directly,
-check the correct charging-document radio, fill the page-2 identifiers, and append
-a supporting affidavit (if a narrative is provided) as extra pages.
-"""
+"""Fill official U.S. court warrant forms and append supporting pages."""
 import io
 import os
 
-import fitz  # PyMuPDF
+import fitz
 
 FORMS_DIR = os.path.join(os.path.dirname(__file__), 'forms')
 AO442_PATH = os.path.join(FORMS_DIR, 'ao442_arrest_warrant.pdf')
 AO93_PATH = os.path.join(FORMS_DIR, 'ao93_search_warrant.pdf')
 
-# charging_document value -> radio "Document" on-state (mapped by field position)
 CHARGING_ON_STATE = {
-    'indictment': '5',
-    'superseding_indictment': '0',
-    'information': '1',
-    'superseding_information': '2',
-    'complaint': '6',
-    'probation_violation': '7',
-    'supervised_release_violation': '3',
-    'violation_notice': '4',
-    'court_order': '8',
+    'indictment': '5', 'superseding_indictment': '0', 'information': '1',
+    'superseding_information': '2', 'complaint': '6',
+    'probation_violation': '7', 'supervised_release_violation': '3',
+    'violation_notice': '4', 'court_order': '8',
 }
 
 
 def _text_map(form_data, officer):
     court = form_data.get('court', {})
-    defn = form_data.get('defendant', {})
-    off = form_data.get('offense', {})
-    ident = form_data.get('identifiers', {})
-    name = defn.get('full_name', '')
+    defendant = form_data.get('defendant', {})
+    offense = form_data.get('offense', {})
+    identifiers = form_data.get('identifiers', {})
+    name = defendant.get('full_name', '')
     associates = '; '.join(
-        f"{a.get('name', '')} ({a.get('relation', '')}) {a.get('phone', '')}".strip()
-        for a in ident.get('known_associates', [])
+        f"{item.get('name', '')} ({item.get('relation', '')}) {item.get('phone', '')}".strip()
+        for item in identifiers.get('known_associates', [])
     )
     return {
-        # Page 1 (warrant face)
         'Dist.Info': (court.get('district') or officer.get('agency_judicial_district')
                       or officer.get('agency_state') or ''),
-        'Defendant1': name,
-        'Defendant2': name,
+        'Defendant1': name, 'Defendant2': name,
         'Case number': form_data.get('case_number', ''),
         'Offense Description': (
-            f"{off.get('code_section', '')}  {off.get('brief_description', '')}".strip()
+            f"{offense.get('code_section', '')}  {offense.get('brief_description', '')}".strip()
         ),
-        # Page 2 (sealed identifiers)
         'Defendant3': name,
-        'Aliases': ', '.join(ident.get('aliases', [])),
-        'Last Known residence': ident.get('last_known_residence', ''),
-        'Prior addresses1': '; '.join(ident.get('prior_addresses', [])),
-        'Last Known Employment': ident.get('last_known_employment', ''),
-        'Last known telephone numbers': ', '.join(ident.get('phone_numbers', [])),
-        'Place of birth': ident.get('place_of_birth', ''),
-        'DOB': ident.get('date_of_birth', ''),
-        'Social Security number': ident.get('ssn', ''),
-        'Height': ident.get('height', ''),
-        'Weight': ident.get('weight', ''),
-        'Sex': ident.get('sex', ''),
-        'Race': ident.get('race', ''),
-        'Hair': ident.get('hair', ''),
-        'Eyes': ident.get('eyes', ''),
-        'Distinguishing marks1': ident.get('distinguishing_marks', ''),
-        'History': ident.get('history_violence_weapons_drugs', ''),
-        'Family1': associates,
-        'FBI number': ident.get('fbi_number', ''),
-        'Auto1': ident.get('vehicle_description', ''),
-        'Agency address': ident.get('investigative_agency', ''),
+        'Aliases': ', '.join(identifiers.get('aliases', [])),
+        'Last Known residence': identifiers.get('last_known_residence', ''),
+        'Prior addresses1': '; '.join(identifiers.get('prior_addresses', [])),
+        'Last Known Employment': identifiers.get('last_known_employment', ''),
+        'Last known telephone numbers': ', '.join(identifiers.get('phone_numbers', [])),
+        'Place of birth': identifiers.get('place_of_birth', ''),
+        'DOB': identifiers.get('date_of_birth', ''),
+        'Social Security number': identifiers.get('ssn', ''),
+        'Height': identifiers.get('height', ''), 'Weight': identifiers.get('weight', ''),
+        'Sex': identifiers.get('sex', ''), 'Race': identifiers.get('race', ''),
+        'Hair': identifiers.get('hair', ''), 'Eyes': identifiers.get('eyes', ''),
+        'Distinguishing marks1': identifiers.get('distinguishing_marks', ''),
+        'History': identifiers.get('history_violence_weapons_drugs', ''),
+        'Family1': associates, 'FBI number': identifiers.get('fbi_number', ''),
+        'Auto1': identifiers.get('vehicle_description', ''),
+        'Agency address': identifiers.get('investigative_agency', ''),
     }
 
 
 def _add_watermark(doc):
+    text = 'UNVERIFIED ACCOUNT - TEST USE ONLY'
+    font_size = 20
+    text_width = fitz.get_text_length(text, fontname='helv', fontsize=font_size)
     for page in doc:
         page.insert_text(
-            fitz.Point(72, 400), "UNVERIFIED ACCOUNT - TEST USE ONLY",
-            color=(1, 0, 0), fontsize=28, fontname="helv", rotate=-45, fill_opacity=0.25
+            fitz.Point(max(36, (page.rect.width - text_width) / 2), page.rect.height / 2),
+            text, color=(1, 0, 0), fontsize=font_size, fontname='helv',
+            rotate=0, fill_opacity=0.25, overlay=True,
         )
 
 
 def fill_arrest_warrant(form_data, narrative, officer, doc_meta=None, is_test_export=False) -> bytes:
     text_map = _text_map(form_data, officer)
     charge_state = CHARGING_ON_STATE.get(form_data.get('charging_document', ''))
-
     doc = fitz.open(AO442_PATH)
     for page in doc:
-        for w in (page.widgets() or []):
-            fn = w.field_name
-            if fn in text_map and text_map[fn]:
-                w.field_value = str(text_map[fn])
-                w.update()
-            elif fn == 'Document' and charge_state:
-                ons = [s for s in w.button_states().get('normal', []) if s != 'Off']
-                if ons and ons[0] == charge_state:
-                    w.field_value = charge_state
-                    w.update()
+        for widget in (page.widgets() or []):
+            name = widget.field_name
+            if name in text_map and text_map[name]:
+                widget.field_value = str(text_map[name])
+                widget.update()
+            elif name == 'Document' and charge_state:
+                on_states = [s for s in widget.button_states().get('normal', []) if s != 'Off']
+                if on_states and on_states[0] == charge_state:
+                    widget.field_value = charge_state
+                    widget.update()
 
-    # Append a supporting affidavit (extra pages) when a narrative is supplied.
     if narrative and narrative.strip():
         from .pdf import render_simple_pdf
-        aff_bytes = render_simple_pdf('SUPPORTING AFFIDAVIT', narrative, officer, doc_meta)
-        aff = fitz.open(stream=aff_bytes, filetype='pdf')
-        doc.insert_pdf(aff)
-        aff.close()
-
+        affidavit_bytes = render_simple_pdf('SUPPORTING AFFIDAVIT', narrative, officer, doc_meta)
+        affidavit = fitz.open(stream=affidavit_bytes, filetype='pdf')
+        doc.insert_pdf(affidavit)
+        affidavit.close()
     if is_test_export:
         _add_watermark(doc)
-
-    out = io.BytesIO(doc.tobytes())
+    output = io.BytesIO(doc.tobytes())
     doc.close()
-    return out.getvalue()
+    return output.getvalue()
 
 
 def fill_search_warrant(form_data, narrative, officer, doc_meta=None, is_test_export=False) -> bytes:
-    """
-    Overlay the official (flat) AO 93 face form by anchor position, then append
-    Attachment A / Attachment B / Affidavit pages.
-    """
     court = form_data.get('court', {})
     district = (court.get('district') or officer.get('agency_judicial_district')
                 or officer.get('agency_state') or '')
-    # "Central District of California" -> ("Central", "California");
-    # "District of Connecticut" -> ("", "Connecticut") — the form already
-    # prints "District of", so only the parts around it are overlaid. Anything
-    # that doesn't match the pattern goes whole into the wide second blank.
-    prefix, sep, state = district.partition(' District of ')
-    if not sep:
+    prefix, separator, state = district.partition(' District of ')
+    if not separator:
         prefix, state = '', district.removeprefix('District of ').strip()
     execution = form_data.get('execution', {})
     place = form_data.get('place_to_search', {})
-
     doc = fitz.open(AO93_PATH)
     page = doc[0]
 
-    def put(x, y, text, size=9):
-        if text:
-            page.insert_text((x, y), str(text), fontsize=size)
+    def put(x, y, value, size=9):
+        if value:
+            page.insert_text((x, y), str(value), fontsize=size)
 
-    # Caption: "for the ___ District of ___"
     put(232, 119, prefix)
     put(335, 119, state)
-    # Caption block: "In the Matter of the Search of (Briefly describe…)" —
-    # the property description/address goes right under the italic hint text.
-    caption = '\n'.join(t for t in [place.get('description'), place.get('address')] if t)
+    caption = '\n'.join(value for value in (place.get('description'), place.get('address')) if value)
     for size in (9, 8, 7, 6):
-        if not caption or page.insert_textbox(
-                fitz.Rect(35, 176, 295, 245), caption, fontsize=size) >= 0:
+        if not caption or page.insert_textbox(fitz.Rect(35, 176, 295, 245), caption, fontsize=size) >= 0:
             break
-    # "located in the ___ District of ___"
     put(240, 284, prefix)
     put(415, 284, state)
-"""
-Fill official fillable U.S. court forms (AcroForm field-fill) for court-exact output.
-
-AO 442 (Arrest Warrant) is a fillable AcroForm — we set its named fields directly,
-check the correct charging-document radio, fill the page-2 identifiers, and append
-a supporting affidavit (if a narrative is provided) as extra pages.
-"""
-import io
-import os
-
-import fitz  # PyMuPDF
-
-FORMS_DIR = os.path.join(os.path.dirname(__file__), 'forms')
-AO442_PATH = os.path.join(FORMS_DIR, 'ao442_arrest_warrant.pdf')
-AO93_PATH = os.path.join(FORMS_DIR, 'ao93_search_warrant.pdf')
-
-# charging_document value -> radio "Document" on-state (mapped by field position)
-CHARGING_ON_STATE = {
-    'indictment': '5',
-    'superseding_indictment': '0',
-    'information': '1',
-    'superseding_information': '2',
-    'complaint': '6',
-    'probation_violation': '7',
-    'supervised_release_violation': '3',
-    'violation_notice': '4',
-    'court_order': '8',
-}
-
-
-def _text_map(form_data, officer):
-    court = form_data.get('court', {})
-    defn = form_data.get('defendant', {})
-    off = form_data.get('offense', {})
-    ident = form_data.get('identifiers', {})
-    name = defn.get('full_name', '')
-    associates = '; '.join(
-        f"{a.get('name', '')} ({a.get('relation', '')}) {a.get('phone', '')}".strip()
-        for a in ident.get('known_associates', [])
-    )
-    return {
-        # Page 1 (warrant face)
-        'Dist.Info': (court.get('district') or officer.get('agency_judicial_district')
-                      or officer.get('agency_state') or ''),
-        'Defendant1': name,
-        'Defendant2': name,
-        'Case number': form_data.get('case_number', ''),
-        'Offense Description': (
-            f"{off.get('code_section', '')}  {off.get('brief_description', '')}".strip()
-        ),
-        # Page 2 (sealed identifiers)
-        'Defendant3': name,
-        'Aliases': ', '.join(ident.get('aliases', [])),
-        'Last Known residence': ident.get('last_known_residence', ''),
-        'Prior addresses1': '; '.join(ident.get('prior_addresses', [])),
-        'Last Known Employment': ident.get('last_known_employment', ''),
-        'Last known telephone numbers': ', '.join(ident.get('phone_numbers', [])),
-        'Place of birth': ident.get('place_of_birth', ''),
-        'DOB': ident.get('date_of_birth', ''),
-        'Social Security number': ident.get('ssn', ''),
-        'Height': ident.get('height', ''),
-        'Weight': ident.get('weight', ''),
-        'Sex': ident.get('sex', ''),
-        'Race': ident.get('race', ''),
-        'Hair': ident.get('hair', ''),
-        'Eyes': ident.get('eyes', ''),
-        'Distinguishing marks1': ident.get('distinguishing_marks', ''),
-        'History': ident.get('history_violence_weapons_drugs', ''),
-        'Family1': associates,
-        'FBI number': ident.get('fbi_number', ''),
-        'Auto1': ident.get('vehicle_description', ''),
-        'Agency address': ident.get('investigative_agency', ''),
-    }
-
-
-def _add_watermark(doc):
-    for page in doc:
-        page.insert_text(
-            fitz.Point(72, 400), "UNVERIFIED ACCOUNT - TEST USE ONLY",
-            color=(1, 0, 0), fontsize=28, fontname="helv", rotate=-45, fill_opacity=0.25
-        )
-
-
-def fill_arrest_warrant(form_data, narrative, officer, doc_meta=None, is_test_export=False) -> bytes:
-    text_map = _text_map(form_data, officer)
-    charge_state = CHARGING_ON_STATE.get(form_data.get('charging_document', ''))
-
-    doc = fitz.open(AO442_PATH)
-    for page in doc:
-        for w in (page.widgets() or []):
-            fn = w.field_name
-            if fn in text_map and text_map[fn]:
-                w.field_value = str(text_map[fn])
-                w.update()
-            elif fn == 'Document' and charge_state:
-                ons = [s for s in w.button_states().get('normal', []) if s != 'Off']
-                if ons and ons[0] == charge_state:
-                    w.field_value = charge_state
-                    w.update()
-
-    # Append a supporting affidavit (extra pages) when a narrative is supplied.
-    if narrative and narrative.strip():
-        from .pdf import render_simple_pdf
-        aff_bytes = render_simple_pdf('SUPPORTING AFFIDAVIT', narrative, officer, doc_meta)
-        aff = fitz.open(stream=aff_bytes, filetype='pdf')
-        doc.insert_pdf(aff)
-        aff.close()
-
-    if is_test_export:
-        _add_watermark(doc)
-
-    out = io.BytesIO(doc.tobytes())
-    doc.close()
-    return out.getvalue()
-
-
-def fill_search_warrant(form_data, narrative, officer, doc_meta=None, is_test_export=False) -> bytes:
-    """
-    Overlay the official (flat) AO 93 face form by anchor position, then append
-    Attachment A / Attachment B / Affidavit pages.
-    """
-    court = form_data.get('court', {})
-    district = (court.get('district') or officer.get('agency_judicial_district')
-                or officer.get('agency_state') or '')
-    # "Central District of California" -> ("Central", "California");
-    # "District of Connecticut" -> ("", "Connecticut") — the form already
-    # prints "District of", so only the parts around it are overlaid. Anything
-    # that doesn't match the pattern goes whole into the wide second blank.
-    prefix, sep, state = district.partition(' District of ')
-    if not sep:
-        prefix, state = '', district.removeprefix('District of ').strip()
-    execution = form_data.get('execution', {})
-    place = form_data.get('place_to_search', {})
-
-    doc = fitz.open(AO93_PATH)
-    page = doc[0]
-
-    def put(x, y, text, size=9):
-        if text:
-            page.insert_text((x, y), str(text), fontsize=size)
-
-    # Caption: "for the ___ District of ___"
-    put(232, 119, prefix)
-    put(335, 119, state)
-    # Caption block: "In the Matter of the Search of (Briefly describe…)" —
-    # the property description/address goes right under the italic hint text.
-    caption = '\n'.join(t for t in [place.get('description'), place.get('address')] if t)
-    for size in (9, 8, 7, 6):
-        if not caption or page.insert_textbox(
-                fitz.Rect(35, 176, 295, 245), caption, fontsize=size) >= 0:
-            break
-    # "located in the ___ District of ___"
-    put(240, 284, prefix)
-    put(415, 284, state)
-    # Case number
     put(372, 172, form_data.get('case_number', ''))
-    # Person/property to be searched (Attachment A reference)
     put(57, 312, 'See Attachment A.')
-    # Items to be seized (below "such search will reveal")
     put(57, 410, 'See Attachment B.')
-    # Execute on or before <date>
     put(350, 497, execution.get('execute_by_date', ''))
-    # Daytime vs anytime checkbox
-    if execution.get('time_window') == 'anytime':
-        put(242, 512, 'X', 11)
-    else:
-        put(45, 512, 'X', 11)
-    # Return to <magistrate judge>
+    put(242 if execution.get('time_window') == 'anytime' else 45, 512, 'X', 11)
     put(430, 593, court.get('judge_name', ''))
 
-    # Append Attachment A / B / Affidavit pages.
     from .pdf import render_sw_attachments
-    extra = render_sw_attachments(form_data, narrative, officer, doc_meta)
-    ex = fitz.open(stream=extra, filetype='pdf')
-    doc.insert_pdf(ex)
-    ex.close()
-
+    extra_bytes = render_sw_attachments(form_data, narrative, officer, doc_meta)
+    extra = fitz.open(stream=extra_bytes, filetype='pdf')
+    doc.insert_pdf(extra)
+    extra.close()
     if is_test_export:
         _add_watermark(doc)
-
-    out = io.BytesIO(doc.tobytes())
+    output = io.BytesIO(doc.tobytes())
     doc.close()
-    return out.getvalue()
+    return output.getvalue()

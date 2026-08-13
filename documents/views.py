@@ -267,22 +267,25 @@ class ExportDocumentView(APIView):
         # officer's behalf must not stamp the admin's own badge/ORI onto it.
         officer = _officer_profile(doc.user)
 
-        required_profile_fields = [
-            ('first_name', 'first name'), ('last_name', 'last name'),
-            ('badge_number', 'badge number'), ('rank', 'rank or title'),
-        ]
-        missing_profile = [
-            label for field, label in required_profile_fields
-            if not getattr(doc.user, field, '').strip()
-        ]
-        if missing_profile:
-            return Response({'error': {
-                'detail': f"Complete your officer profile before export. Missing: {', '.join(missing_profile)}.",
-                'code': 'incomplete_officer_profile', 'missing_fields': missing_profile,
-            }}, status=400)
-        is_test_export = False
-        if not doc.user.agency_id:
-            is_test_export = True
+        is_test_export = not doc.user.agency_id
+
+        # Agency-free accounts may immediately evaluate the complete workflow.
+        # Their exports are visibly marked test-only and never receive official
+        # agency credentials. Assigned officers must complete their identity.
+        if not is_test_export:
+            required_profile_fields = [
+                ('first_name', 'first name'), ('last_name', 'last name'),
+                ('badge_number', 'badge number'), ('rank', 'rank or title'),
+            ]
+            missing_profile = [
+                label for field, label in required_profile_fields
+                if not getattr(doc.user, field, '').strip()
+            ]
+            if missing_profile:
+                return Response({'error': {
+                    'detail': f"Complete your officer profile before export. Missing: {', '.join(missing_profile)}.",
+                    'code': 'incomplete_officer_profile', 'missing_fields': missing_profile,
+                }}, status=400)
 
         # Never silently substitute another department's identity onto a real
         # filing — require the officer's own profile to be complete instead.
@@ -290,7 +293,7 @@ class ExportDocumentView(APIView):
             label for field, label in INCIDENT_REPORT_REQUIRED_OFFICER_FIELDS
             if doc.doc_type == 'incident_report' and not officer.get(field)
         ]
-        if missing:
+        if missing and not is_test_export:
             return Response(
                 {'error': {
                     'detail': f"Your officer profile is missing required information ({', '.join(missing)}) "
@@ -304,6 +307,13 @@ class ExportDocumentView(APIView):
         # agency keys. Provide placeholder headers so the document generates successfully.
         if is_test_export:
             officer.update({
+                'full_name': officer.get('full_name') or '[TEST USER]',
+                'badge_number': officer.get('badge_number') or '[TEST]',
+                'rank': officer.get('rank') or '[TEST USER]',
+                'department_name': '[UNVERIFIED AGENCY]',
+                'ori_number': '[TEST ORI]',
+                'department_address': '[TEST ADDRESS]',
+                'state': '[TEST STATE]',
                 'agency_state': '[TEST STATE]',
                 'agency_county': '[TEST COUNTY]',
                 'agency_court_name': '[TEST COURT]',

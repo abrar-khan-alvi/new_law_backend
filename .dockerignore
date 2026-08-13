@@ -1,0 +1,22 @@
+.git
+.github
+.claude
+.vscode
+.env
+.env.*
+!.env.example
+!.env.aws.example
+secrets
+charisma-expert/node_modules
+charisma-expert/dist
+node_modules
+media
+__pycache__
+*.py[cod]
+*.sqlite3
+*.png
+*.jpg
+*.jpeg
+*.log
+/Home Page. Klyvorek.pdf
+/Changes to AI for Law Enforcement Website 1.pdf
