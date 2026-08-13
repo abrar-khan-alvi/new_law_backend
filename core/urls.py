@@ -5,6 +5,8 @@ from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
 
+from .contact import ContactView
+
 
 def health(_request):
     """Lightweight liveness probe."""
@@ -14,6 +16,7 @@ def health(_request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('health/', health),
+    path('api/contact/', ContactView.as_view()),
 
     path('api/auth/', include('accounts.urls')),
     path('api/documents/', include('documents.urls')),

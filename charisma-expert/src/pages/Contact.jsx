@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Mail, Phone, MapPin } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { sendContactMessage } from '../api/contact'
 
 const contactInfo = [
   {
@@ -30,14 +31,25 @@ export default function Contact() {
     message: '',
   })
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    setSubmitted(true)
+    setSubmitting(true)
+    setError('')
+    try {
+      await sendContactMessage(form)
+      setSubmitted(true)
+    } catch (err) {
+      setError(err.response?.data?.error?.detail || 'Unable to send your message right now. Please email klyvorek@gmail.com directly.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -85,6 +97,11 @@ export default function Contact() {
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-5">
+                  {error && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {error}
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -162,9 +179,10 @@ export default function Contact() {
                   <button
                     type="submit"
                     id="contact-submit-btn"
-                    className="w-full bg-navy-800 hover:bg-navy-700 text-white font-semibold py-3.5 rounded-xl transition-colors"
+                    disabled={submitting}
+                    className="w-full bg-navy-800 hover:bg-navy-700 text-white font-semibold py-3.5 rounded-xl transition-colors disabled:opacity-60"
                   >
-                    Send Message
+                    {submitting ? 'Sending...' : 'Send Message'}
                   </button>
                 </form>
               )}
