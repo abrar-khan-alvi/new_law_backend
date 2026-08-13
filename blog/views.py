@@ -41,8 +41,9 @@ class BlogPostListView(APIView):
         return [IsAdmin()] if self.request.method == 'POST' else [AllowAny()]
 
     def get(self, request):
-        qs = BlogPost.objects.filter(is_published=True).select_related(
-            'author').prefetch_related('tags', 'media')
+        qs = BlogPost.objects.all().select_related('author').prefetch_related('tags', 'media')
+        if not (request.user.is_authenticated and request.user.role == 'admin'):
+            qs = qs.filter(is_published=True)
         qs = BlogPostFilter(request.GET, queryset=qs).qs
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
