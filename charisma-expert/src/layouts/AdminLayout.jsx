@@ -21,8 +21,11 @@ import logoImg from '../assets/logo.png';
 const AdminLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { adminLogout } = useAuth();
+  const { adminUser, adminLogout } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const adminName = adminUser?.full_name || [adminUser?.first_name, adminUser?.last_name].filter(Boolean).join(' ') || adminUser?.email || 'Admin';
+  const adminSubtitle = adminUser?.email || 'Platform administrator';
+  const adminInitial = adminName.charAt(0).toUpperCase();
 
   useEffect(() => {
     setIsSidebarOpen(false);
@@ -109,14 +112,12 @@ const AdminLayout = () => {
         {/* Profile & Logout */}
         <div className="p-4 border-t border-gray-800">
           <div className="flex items-center mb-4 px-2">
-            <img 
-              src="https://i.pravatar.cc/150?img=11" 
-              alt="System Admin" 
-              className="w-10 h-10 rounded-full mr-3 border border-gray-700"
-            />
-            <div>
-              <div className="text-sm font-medium text-white">System Admin</div>
-              <div className="text-xs text-gray-400">Owner</div>
+            <div className="w-10 h-10 rounded-full mr-3 border border-gray-700 bg-blue-600 text-white flex items-center justify-center text-sm font-bold">
+              {adminInitial}
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-white truncate">{adminName}</div>
+              <div className="text-xs text-gray-400 truncate">{adminSubtitle}</div>
             </div>
           </div>
           <button 
