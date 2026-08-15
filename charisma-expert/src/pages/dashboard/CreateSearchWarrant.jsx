@@ -235,7 +235,7 @@ export default function CreateSearchWarrant() {
               <textarea rows="3" value={affiantBackground} onChange={(e) => setAffiantBackground(e.target.value)} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg resize-none" placeholder="e.g. FBI Special Agent, cybercrime since 2018..."></textarea>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Connection Between Evidence and Location *</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Connection Between Suspect and Location *</label>
               <textarea rows="3" value={nexusToPlace} onChange={(e) => setNexusToPlace(e.target.value)} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg resize-none" placeholder="e.g. Evidence physically resides on these servers..."></textarea>
             </div>
             <div className="md:col-span-2">

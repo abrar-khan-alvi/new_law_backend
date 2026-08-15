@@ -16,14 +16,14 @@ const modules = [
     iconBg: 'bg-yellow-50',
     title: 'Search Warrant Applications',
     description:
-      'Organize probable-cause facts, places, property, and requested authority in an agency-configured draft for review.',
+      'Organize probable cause facts, places, property, and requested authority in an agency-configured draft for review.',
   },
   {
     icon: <BookOpen size={28} className="text-teal-500" />,
     iconBg: 'bg-teal-50',
     title: 'Arrest Warrant Applications',
     description:
-      'Structure offense, subject, evidence, and probable-cause information supplied by the officer into a reviewable application draft.',
+      'Structure offense, subject, evidence, and probable cause information supplied by the officer into a reviewable application draft.',
   },
 ]
 

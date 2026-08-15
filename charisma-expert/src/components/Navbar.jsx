@@ -43,7 +43,7 @@ export default function Navbar() {
             />
             <div className="leading-tight hidden sm:block whitespace-nowrap">
               <p className="text-base font-extrabold tracking-[0.16em] text-navy-800">KLYVOREK</p>
-              <p className="text-[10px] uppercase tracking-[0.12em] text-gray-500">AI-assisted documentation</p>
+              <p className="text-[9px] tracking-[0.06em] text-gray-500">AI-Assisted Law Enforcement Documentation</p>
             </div>
           </Link>
 
