@@ -186,6 +186,23 @@ def _incident(form_data, narrative, officer):
     reported_dt = f"{inc.get('reported_date') or inc.get('date', '')} {inc.get('reported_time') or inc.get('time', '')}".strip()
     secure_dt = f"{inc.get('date', '')} {inc.get('time', '')}".strip()
 
+    def _display_name(person):
+        name = person.get('full_name') or '-'
+        alias = person.get('alias')
+        return f"{name} (Alias: {alias})" if alias else name
+
+    notification_summary = []
+    if notif.get('acts_of_terrorism'):
+        notification_summary.append(f"Acts of terrorism: {notif.get('acts_of_terrorism_detail') or 'Yes'}")
+    if notif.get('death_involved'):
+        notification_summary.append(f"Death involved: {notif.get('death_detail') or 'Yes'}")
+    if notif.get('is_hazing'):
+        notification_summary.append('Hazing related: Yes')
+    if notif.get('alcohol_drugs'):
+        notification_summary.append(f"Alcohol/drugs: {notif.get('alcohol_drugs_detail') or 'Yes'}")
+    if notif.get('outside_agency'):
+        notification_summary.append(f"Outside agency notified: {notif.get('outside_agency')}")
+
     header_data = [
         [
             _c("Agency Name", officer.get("department_name") or "(department not set)"),
@@ -316,7 +333,7 @@ def _incident(form_data, narrative, officer):
             _c("Domestic", "N"),
         ]], [1.3, 1.9, 2.1, 1.9]),
         _simple_grid([[
-            _c("V1 Victim/Business Name (Last, First, Middle)", v.get('full_name') or "-"),
+            _c("V1 Victim/Business Name (Last, First, Middle)", _display_name(v)),
             _c("Victim of Crime #", "1"),
             _c("DOB / Age", f"{dob_val} / {age_val}"),
             _c("Race", v.get('race') or 'U'),
@@ -372,7 +389,7 @@ def _incident(form_data, narrative, officer):
         ]], [3.6, 3.6]))
         others_tables.append(_simple_grid([[
             _c("Code", role_code if o else ""),
-            _c("Name (Last, First, Middle)", o.get('full_name') or ("-" if o else "")),
+            _c("Name (Last, First, Middle)", _display_name(o) if o else ""),
             _c("Victim of Crime #", ""),
             _c("DOB / Age", o.get('dob') or ("-" if o else "")),
             _c("Race", (o.get('race') or 'U') if o else ""),
@@ -447,6 +464,10 @@ def _incident(form_data, narrative, officer):
         _c("Case Disposition / Date", f"8 / {reported_dt.split(' ')[0] if reported_dt else '-'}"),
     ]], [2.4, 2.4, 2.4])
     story.append(_banded('Status', [t_status]))
+    if notification_summary:
+        story.append(_banded('Notifications', [
+            _simple_grid([[_c("Critical Notifications", '; '.join(notification_summary))]], [7.2])
+        ]))
 
     # 8. Extra Name List Page (If needed)
     if len(victims) > 1 or len(others) > 2:
@@ -459,7 +480,7 @@ def _incident(form_data, narrative, officer):
             role_code = "V" if p.get('role') == 'victim' else ("WI" if p.get('role') == 'witness' else "IO")
             extra_rows.append([
                 Paragraph(f"{idx+1}) {role_code}", _VALUE),
-                Paragraph(p.get('full_name') or '-', _VALUE),
+                Paragraph(_display_name(p), _VALUE),
                 Paragraph(f"DOB: {p.get('dob') or '-'} | Sex: {p.get('sex') or '-'} | Race: {p.get('race') or '-'}", _BODY)
             ])
         t_extra = Table(extra_rows, colWidths=[1.5 * inch, 3.0 * inch, 3.0 * inch])

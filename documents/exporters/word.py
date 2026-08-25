@@ -249,6 +249,23 @@ def _incident(doc, form_data, narrative, officer):
     reported_dt = f"{inc.get('reported_date') or inc.get('date', '')} {inc.get('reported_time') or inc.get('time', '')}".strip()
     secure_dt = f"{inc.get('date', '')} {inc.get('time', '')}".strip()
 
+    def _display_name(person):
+        name = person.get('full_name') or '-'
+        alias = person.get('alias')
+        return f"{name} (Alias: {alias})" if alias else name
+
+    notification_summary = []
+    if notif.get('acts_of_terrorism'):
+        notification_summary.append(f"Acts of terrorism: {notif.get('acts_of_terrorism_detail') or 'Yes'}")
+    if notif.get('death_involved'):
+        notification_summary.append(f"Death involved: {notif.get('death_detail') or 'Yes'}")
+    if notif.get('is_hazing'):
+        notification_summary.append('Hazing related: Yes')
+    if notif.get('alcohol_drugs'):
+        notification_summary.append(f"Alcohol/drugs: {notif.get('alcohol_drugs_detail') or 'Yes'}")
+    if notif.get('outside_agency'):
+        notification_summary.append(f"Outside agency notified: {notif.get('outside_agency')}")
+
     # 1. Header grid — band | agency/ORI/location | title + gang/premise/beat |
     #    stacked Case# / Date Reported / Last Known Secure / At Found column
     t = doc.add_table(rows=4, cols=6)
@@ -311,7 +328,7 @@ def _incident(doc, form_data, narrative, officer):
          ('Domestic', 'N')],
     ], band='VICTIM')
     _grid(doc, [
-        [('V1 Victim/Business Name (Last, First, Middle)', v.get('full_name') or '-'),
+        [('V1 Victim/Business Name (Last, First, Middle)', _display_name(v)),
          ('Victim of Crime #', '1'),
          ('DOB / Age', v.get('dob') or '-'),
          ('Race', v.get('race') or 'U'),
@@ -353,7 +370,7 @@ def _incident(doc, form_data, narrative, officer):
         ], band='OTHERS INVOLVED' if idx == 0 else '')
         _grid(doc, [
             [('Code', role_code if o else ''),
-             ('Name (Last, First, Middle)', o.get('full_name') or ('-' if o else '')),
+             ('Name (Last, First, Middle)', _display_name(o) if o else ''),
              ('Victim of Crime #', ''),
              ('DOB / Age', o.get('dob') or ('-' if o else '')),
              ('Race', (o.get('race') or 'U') if o else ''),
@@ -412,6 +429,8 @@ def _incident(doc, form_data, narrative, officer):
          ('Case Status', 'Closed By Investigation'),
          ('Case Disposition / Date', f"8 / {reported_dt.split(' ')[0] if reported_dt else '-'}")],
     ], band='Status')
+    if notification_summary:
+        _grid(doc, [[('Critical Notifications', '; '.join(notification_summary))]], band='Notifications')
 
     # 8. Page 2 — drugs / assisting officers / hate-bias (template page 2)
     doc.add_page_break()

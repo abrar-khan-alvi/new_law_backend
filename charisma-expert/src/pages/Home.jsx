@@ -23,7 +23,7 @@ const modules = [
     iconBg: 'bg-teal-50',
     title: 'Arrest Warrant Applications',
     description:
-      'Structure offense, subject, evidence, and probable cause information supplied by the officer into a reviewable application draft.',
+      'Structure offense details, subject information, evidence, and probable cause information supplied by the officer into a reviewable application draft.',
   },
 ]
 
@@ -64,18 +64,24 @@ export default function Home() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-gray-900/85 via-gray-900/50 to-transparent" />
         <div className="relative z-10 w-full px-6 lg:px-10 xl:px-16 py-24">
-          <div className="max-w-2xl xl:max-w-3xl">
+          <div className="max-w-3xl xl:max-w-5xl">
             {/* Badge */}
             <span className="inline-flex items-center gap-2 bg-yellow-400/20 border border-yellow-400/40 text-yellow-300 text-sm font-semibold px-4 py-2 rounded-full mb-8">
               <Shield size={14} />
               Officer-Controlled AI Assistance
             </span>
 
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold text-white leading-tight mb-8 tracking-tight">
-              Turn Officer-Provided Facts<br />Into Clear, Structured<br />Reports
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-[3.5rem] font-extrabold text-white leading-tight mb-6 tracking-tight">
+              Turn Officer-Provided Facts Into Clear, Structured Reports
             </h1>
-            <p className="text-gray-300 text-lg sm:text-xl lg:text-2xl leading-relaxed mb-10 max-w-2xl">
-              Create incident reports and structured warrant application drafts using your agency information and the facts you provide. Every document remains under authorized human review.
+            <p className="text-white text-lg sm:text-xl font-bold mb-4">
+              Your police work speaks for itself. Does your report?
+            </p>
+            <p className="text-gray-300 text-base sm:text-lg lg:text-xl leading-relaxed mb-6 max-w-2xl">
+              Create clear incident reports and structured warrant application drafts from your facts, while you stay in control.
+            </p>
+            <p className="text-gray-300 text-base sm:text-lg lg:text-xl leading-relaxed mb-10 max-w-2xl">
+              Write Like the Professional You Are.
             </p>
 
 
@@ -184,7 +190,7 @@ export default function Home() {
                 Create your first incident report draft free.
               </h2>
               <p className="text-blue-200 text-base sm:text-lg mb-8">
-                No payment card required. Review every draft before operational or legal use.
+                No credit card payment required. Review every draft before operational or legal use.
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link

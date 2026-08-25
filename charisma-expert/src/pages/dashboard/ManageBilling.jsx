@@ -13,16 +13,40 @@ export default function ManageBilling() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([
-      listPlans().catch(() => ({ data: [] })),
-      getSubscriptionStatus().catch(() => ({ data: null }))
+    Promise.allSettled([
+      listPlans(),
+      getSubscriptionStatus()
     ])
-      .then(([plansRes, subRes]) => {
-        setPlans(plansRes.data);
-        setSubscription(subRes.data);
+      .then(([plansResult, subResult]) => {
+        if (plansResult.status === 'fulfilled') {
+          setPlans(Array.isArray(plansResult.value.data) ? plansResult.value.data : []);
+        } else {
+          setError('Unable to load available plans. Please refresh or contact support.');
+        }
+
+        if (subResult.status === 'fulfilled') {
+          setSubscription(subResult.value.data);
+        }
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const refreshBilling = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [plansRes, subRes] = await Promise.all([
+        listPlans(),
+        getSubscriptionStatus().catch(() => ({ data: null }))
+      ]);
+      setPlans(Array.isArray(plansRes.data) ? plansRes.data : []);
+      setSubscription(subRes.data);
+    } catch {
+      setError('Unable to load available plans. Please refresh or contact support.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCheckout = async (plan) => {
     setMessage('');
@@ -105,8 +129,28 @@ export default function ManageBilling() {
 
       <div className="pt-6">
         <h2 className="text-xl font-bold text-gray-900 mb-6 font-serif">Available Plans</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-          {plans.map((plan) => {
+        {plans.length === 0 ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">
+            <div className="flex items-start gap-3">
+              <AlertCircle size={20} className="mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold">No active billing plans are configured.</p>
+                <p className="mt-1 text-sm text-amber-800">
+                  Ask an administrator to run the plan seed task or activate plans in the admin panel.
+                </p>
+                <button
+                  type="button"
+                  onClick={refreshBilling}
+                  className="mt-4 rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+            {plans.map((plan) => {
             const isCurrentPlan = currentPlan?.id === plan.id;
             const isPopular = plan.name === 'standard';
             const isProcessing = checkoutLoadingFor === plan.id;
@@ -214,8 +258,9 @@ export default function ManageBilling() {
                 </button>
               </div>
             );
-          })}
-        </div>
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

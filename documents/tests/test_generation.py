@@ -211,7 +211,10 @@ class IncidentReportExportValidationTests(TestCase):
             email='incomplete@example.com', role='officer',
         )
         Subscription.objects.filter(user=self.user).delete()
-        Subscription.objects.create(user=self.user, plan=plan, status='active')
+        Subscription.objects.create(
+            user=self.user, plan=plan, status='active',
+            stripe_subscription_id='sub_export_test',
+        )
         self.doc = GeneratedDocument.objects.create(
             user=self.user, doc_type='incident_report',
             case_number='LE-TEST1', form_data={'facts': {'what': 'test'}},

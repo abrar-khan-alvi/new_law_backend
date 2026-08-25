@@ -1,10 +1,12 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Shield, Clock, Trash2, ArrowRight, Loader2 } from 'lucide-react';
 import { generateDocument } from '../../api/documents';
 
 export default function CreateIncidentReport() {
   const navigate = useNavigate();
+  const locationState = useLocation().state || {};
+  const sourceDoc = locationState.sourceDoc;
   
   // Form State
   const [templateType, setTemplateType] = useState('campus');
@@ -12,6 +14,7 @@ export default function CreateIncidentReport() {
   const [incidentType, setIncidentType] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
+  const [timeFormat, setTimeFormat] = useState('standard');
   const [location, setLocation] = useState('');
   const [reportedDate, setReportedDate] = useState('');
   const [reportedTime, setReportedTime] = useState('');
@@ -23,6 +26,8 @@ export default function CreateIncidentReport() {
   const [factsWhat, setFactsWhat] = useState('');
   const [factsWhen, setFactsWhen] = useState('');
   const [factsWhere, setFactsWhere] = useState('');
+  const [factsWhenTouched, setFactsWhenTouched] = useState(false);
+  const [factsWhereTouched, setFactsWhereTouched] = useState(false);
   const [factsHow, setFactsHow] = useState('');
   const [factsOfficerActions, setFactsOfficerActions] = useState('');
   
@@ -30,7 +35,7 @@ export default function CreateIncidentReport() {
   
   // Involved Parties
   const [involvedParties, setInvolvedParties] = useState([
-    { id: 1, role: 'complainant', full_name: '', id_number: '', phone: '', relationship: '' }
+    { id: 1, role: 'complainant', full_name: '', alias: '', id_number: '', phone: '', relationship: '' }
   ]);
 
   // Property Items
@@ -42,7 +47,11 @@ export default function CreateIncidentReport() {
     weapon_detail: '',
     alcohol_drugs: false,
     alcohol_drugs_detail: '',
-    is_hazing: false
+    is_hazing: false,
+    acts_of_terrorism: false,
+    acts_of_terrorism_detail: '',
+    death_involved: false,
+    death_detail: ''
   });
   
   const [incidentUrgency, setIncidentUrgency] = useState('normal');
@@ -51,8 +60,101 @@ export default function CreateIncidentReport() {
   const [factsAcknowledged, setFactsAcknowledged] = useState(false);
   const [error, setError] = useState('');
 
+  const formatIncidentDateTime = (incidentDate, incidentTime) => {
+    const pieces = [incidentDate, incidentTime].filter(Boolean);
+    return pieces.length ? pieces.join(' ') : '';
+  };
+
+  const normalizeTime = (value) => {
+    const raw = value.trim();
+    if (!raw) return '';
+    const compact = raw.replace(/[^\d]/g, '');
+    if (compact.length === 3 || compact.length === 4) {
+      const padded = compact.padStart(4, '0');
+      const hours = Number(padded.slice(0, 2));
+      const minutes = Number(padded.slice(2));
+      if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+        return `${padded.slice(0, 2)}:${padded.slice(2)}`;
+      }
+    }
+    return raw;
+  };
+
+  const hydrateFromFormData = (formData, style) => {
+    if (!formData) return;
+    const incident = formData.incident || {};
+    const facts = formData.facts || {};
+    const restoredParties = (formData.involved_parties || []).map((party, idx) => ({
+      id: Date.now() + idx,
+      role: party.role || 'other',
+      full_name: party.full_name || '',
+      alias: party.alias || '',
+      id_number: party.id_number || '',
+      phone: party.phone || '',
+      relationship: party.relationship || ''
+    }));
+    const restoredItems = (formData.property_items || []).map((item, idx) => ({
+      id: Date.now() + 1000 + idx,
+      type: item.type || '',
+      value: item.value ?? '',
+      status: item.status || (formData.template_type === 'nibrs' ? 'stolen' : 'missing')
+    }));
+
+    setTemplateType(formData.template_type || 'campus');
+    setCaseNumber(formData.case_number || '');
+    setIncidentType((incident.categories || []).join(', '));
+    setDate(incident.date || '');
+    setTime(incident.time || '');
+    setLocation(incident.location || '');
+    setReportedDate(incident.reported_date || '');
+    setReportedTime(incident.reported_time || '');
+    setIncidentUrgency(incident.urgency || 'normal');
+    setInvolvedParties(restoredParties.length ? restoredParties : []);
+    setPropertyItems(restoredItems);
+    setNotifications({
+      weapon_involved: Boolean(formData.notifications?.weapon_involved),
+      weapon_detail: formData.notifications?.weapon_detail || '',
+      alcohol_drugs: Boolean(formData.notifications?.alcohol_drugs),
+      alcohol_drugs_detail: formData.notifications?.alcohol_drugs_detail || '',
+      is_hazing: Boolean(formData.notifications?.is_hazing),
+      acts_of_terrorism: Boolean(formData.notifications?.acts_of_terrorism),
+      acts_of_terrorism_detail: formData.notifications?.acts_of_terrorism_detail || '',
+      death_involved: Boolean(formData.notifications?.death_involved),
+      death_detail: formData.notifications?.death_detail || ''
+    });
+    setOutsideAgency(formData.notifications?.outside_agency || '');
+    setFactsWho(facts.who || '');
+    setFactsWhat(facts.what || '');
+    setFactsWhen(facts.when || formatIncidentDateTime(incident.date, incident.time));
+    setFactsWhere(facts.where || incident.location || '');
+    setFactsHow(facts.how || '');
+    setFactsOfficerActions(facts.officer_actions || '');
+    setAdditionalNotes(facts.additional_notes || '');
+    setNarrativeStyle(style || 'third_person');
+    setFactsWhenTouched(Boolean(facts.when));
+    setFactsWhereTouched(Boolean(facts.where));
+  };
+
+  useEffect(() => {
+    if (sourceDoc?.form_data) {
+      hydrateFromFormData(sourceDoc.form_data, sourceDoc.narrative_style);
+      setFactsAcknowledged(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceDoc?.id]);
+
+  useEffect(() => {
+    if (!factsWhenTouched) setFactsWhen(formatIncidentDateTime(date, time));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, time, factsWhenTouched]);
+
+  useEffect(() => {
+    if (!factsWhereTouched) setFactsWhere(location);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location, factsWhereTouched]);
+
   const addInvolvedParty = (role) => {
-    setInvolvedParties([...involvedParties, { id: Date.now(), role, full_name: '', id_number: '', phone: '', relationship: '' }]);
+    setInvolvedParties([...involvedParties, { id: Date.now(), role, full_name: '', alias: '', id_number: '', phone: '', relationship: '' }]);
   };
 
   const removeInvolvedParty = (id) => {
@@ -96,6 +198,7 @@ export default function CreateIncidentReport() {
       const party = {
         role: p.role,
         full_name: p.full_name,
+        alias: p.alias || undefined,
         id_number: p.id_number || undefined,
         phone: p.phone || undefined
       };
@@ -193,6 +296,12 @@ export default function CreateIncidentReport() {
         </div>
       </div>
 
+      {sourceDoc && (
+        <div className="p-4 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl text-sm">
+          Editing original facts from case {sourceDoc.case_number || sourceDoc.id}. Submitting this form creates a revised draft while preserving the prior generated document.
+        </div>
+      )}
+
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
           {error}
@@ -285,12 +394,33 @@ export default function CreateIncidentReport() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Time *</label>
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700">Time *</label>
+                  <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setTimeFormat('standard')}
+                      className={`px-2.5 py-1 rounded-md ${timeFormat === 'standard' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                    >
+                      Standard
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTimeFormat('military')}
+                      className={`px-2.5 py-1 rounded-md ${timeFormat === 'military' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                    >
+                      Military
+                    </button>
+                  </div>
+                </div>
                 <input 
-                  type="time" 
+                  type={timeFormat === 'military' ? 'text' : 'time'}
+                  inputMode={timeFormat === 'military' ? 'numeric' : undefined}
                   value={time}
-                  onChange={(e) => setTime(e.target.value)}
+                  onChange={(e) => setTime(timeFormat === 'military' ? e.target.value : normalizeTime(e.target.value))}
+                  onBlur={(e) => setTime(normalizeTime(e.target.value))}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors text-gray-700" 
+                  placeholder={timeFormat === 'military' ? 'e.g. 1930' : undefined}
                   required 
                 />
               </div>
@@ -372,20 +502,46 @@ export default function CreateIncidentReport() {
                   <textarea 
                     rows="3" 
                     value={factsWhen}
-                    onChange={(e) => setFactsWhen(e.target.value)}
+                    onChange={(e) => {
+                      setFactsWhenTouched(true);
+                      setFactsWhen(e.target.value);
+                    }}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors resize-none" 
                     placeholder="e.g. Between 1930 on 01/04 and 1930 on 01/06..."
                   ></textarea>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFactsWhenTouched(false);
+                      setFactsWhen(formatIncidentDateTime(date, time));
+                    }}
+                    className="mt-2 text-xs font-semibold text-blue-700 hover:text-blue-800"
+                  >
+                    Use case date/time
+                  </button>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Where (Location details)</label>
                   <textarea 
                     rows="3" 
                     value={factsWhere}
-                    onChange={(e) => setFactsWhere(e.target.value)}
+                    onChange={(e) => {
+                      setFactsWhereTouched(true);
+                      setFactsWhere(e.target.value);
+                    }}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors resize-none" 
                     placeholder="e.g. Dorm room NC1 1240B..."
                   ></textarea>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFactsWhereTouched(false);
+                      setFactsWhere(location);
+                    }}
+                    className="mt-2 text-xs font-semibold text-blue-700 hover:text-blue-800"
+                  >
+                    Use incident location
+                  </button>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">How (Modus Operandi)</label>
@@ -454,7 +610,16 @@ export default function CreateIncidentReport() {
                       placeholder="Full Name" 
                     />
                   </div>
-                  <div className="md:col-span-3">
+                  <div className="md:col-span-2">
+                    <input
+                      type="text"
+                      value={party.alias || ''}
+                      onChange={(e) => updateInvolvedParty(party.id, 'alias', e.target.value)}
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm"
+                      placeholder="Alias"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
                     <input 
                       type="text" 
                       value={party.id_number}
@@ -463,7 +628,7 @@ export default function CreateIncidentReport() {
                       placeholder="ID Number" 
                     />
                   </div>
-                  <div className="md:col-span-3">
+                  <div className="md:col-span-2">
                     <input 
                       type="text" 
                       value={party.phone}
@@ -613,7 +778,54 @@ export default function CreateIncidentReport() {
                   />
                   <span className="text-gray-800 font-semibold text-sm">Hazing Related</span>
                 </label>
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifications.acts_of_terrorism}
+                    onChange={(e) => setNotifications({...notifications, acts_of_terrorism: e.target.checked})}
+                    className="form-checkbox h-5 w-5 text-red-700 rounded border-gray-300 focus:ring-red-500"
+                  />
+                  <span className="text-gray-800 font-semibold text-sm">Acts of Terrorism</span>
+                </label>
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifications.death_involved}
+                    onChange={(e) => setNotifications({...notifications, death_involved: e.target.checked})}
+                    className="form-checkbox h-5 w-5 text-gray-900 rounded border-gray-300 focus:ring-gray-700"
+                  />
+                  <span className="text-gray-800 font-semibold text-sm">Death Involved</span>
+                </label>
               </div>
+
+              {(notifications.acts_of_terrorism || notifications.death_involved) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {notifications.acts_of_terrorism && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Terrorism Notification Details</label>
+                      <input
+                        type="text"
+                        value={notifications.acts_of_terrorism_detail || ''}
+                        onChange={(e) => setNotifications({ ...notifications, acts_of_terrorism_detail: e.target.value })}
+                        placeholder="Agency notified, threat detail, or related notes"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+                      />
+                    </div>
+                  )}
+                  {notifications.death_involved && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Death Notification Details</label>
+                      <input
+                        type="text"
+                        value={notifications.death_detail || ''}
+                        onChange={(e) => setNotifications({ ...notifications, death_detail: e.target.value })}
+                        placeholder="Decedent, coroner/ME notification, or related notes"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="pt-4 border-t border-gray-100">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Outside Agency Notified</label>
@@ -674,6 +886,50 @@ export default function CreateIncidentReport() {
                     placeholder="e.g. Suspected Marijuana, Alcohol consumption"
                     value={notifications.alcohol_drugs_detail || ''}
                     onChange={(e) => setNotifications({ ...notifications, alcohol_drugs_detail: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 border border-gray-100 rounded-xl bg-gray-50/20">
+                <label className="flex items-center gap-2 font-semibold text-sm text-gray-700 mb-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifications.acts_of_terrorism}
+                    onChange={(e) => setNotifications({ ...notifications, acts_of_terrorism: e.target.checked })}
+                    className="rounded border-gray-300 text-red-700 focus:ring-red-500 h-5 w-5"
+                  />
+                  Acts of Terrorism?
+                </label>
+                {notifications.acts_of_terrorism && (
+                  <input
+                    type="text"
+                    placeholder="Agency notified, threat detail, or related notes"
+                    value={notifications.acts_of_terrorism_detail || ''}
+                    onChange={(e) => setNotifications({ ...notifications, acts_of_terrorism_detail: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+                  />
+                )}
+              </div>
+
+              <div className="p-4 border border-gray-100 rounded-xl bg-gray-50/20">
+                <label className="flex items-center gap-2 font-semibold text-sm text-gray-700 mb-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifications.death_involved}
+                    onChange={(e) => setNotifications({ ...notifications, death_involved: e.target.checked })}
+                    className="rounded border-gray-300 text-gray-900 focus:ring-gray-700 h-5 w-5"
+                  />
+                  Death Involved?
+                </label>
+                {notifications.death_involved && (
+                  <input
+                    type="text"
+                    placeholder="Decedent, coroner/ME notification, or related notes"
+                    value={notifications.death_detail || ''}
+                    onChange={(e) => setNotifications({ ...notifications, death_detail: e.target.value })}
                     className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                   />
                 )}
@@ -741,7 +997,7 @@ export default function CreateIncidentReport() {
             disabled={loading}
             className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-colors shadow-lg shadow-blue-500/30 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            One-Click AI Generation
+            {sourceDoc ? 'Generate Revised Draft' : 'One-Click AI Generation'}
             <ArrowRight className="ml-2" size={18} />
           </button>
         </div>

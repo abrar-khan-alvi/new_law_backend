@@ -68,3 +68,41 @@ class FactsBlockInjectionTests(SimpleTestCase):
         }
         prompt = build_arrest_warrant_prompt(form_data, OFFICER)
         self.assertEqual(prompt.count('=== END FACTS ==='), 1)
+
+
+class IncidentPromptGroundingTests(SimpleTestCase):
+    def test_includes_aliases_and_critical_notifications(self):
+        form_data = {
+            'incident': {'categories': ['Assault'], 'date': '2026-08-24', 'time': '19:30'},
+            'involved_parties': [
+                {'role': 'suspect', 'full_name': 'John Doe', 'alias': 'Spaghetti John'},
+            ],
+            'notifications': {
+                'acts_of_terrorism': True,
+                'acts_of_terrorism_detail': 'FBI notified',
+                'death_involved': True,
+                'death_detail': 'Medical examiner notified',
+            },
+            'facts': {
+                'who': 'John Doe and Jane Roe',
+                'what': 'John Doe struck Jane Roe with a bowl of spaghetti.',
+            },
+        }
+
+        prompt = build_incident_report_prompt(form_data, OFFICER)
+
+        self.assertIn('alias Spaghetti John', prompt)
+        self.assertIn('Acts of terrorism: FBI notified', prompt)
+        self.assertIn('Death involved: Medical examiner notified', prompt)
+
+    def test_preserves_instrument_action_relationship_instruction(self):
+        prompt = build_incident_report_prompt({
+            'incident': {'categories': ['Assault']},
+            'involved_parties': [],
+            'facts': {
+                'what': 'A man hit a woman with a bowl of spaghetti, causing a facial laceration.',
+            },
+        }, OFFICER)
+
+        self.assertIn('Preserve the officer', prompt)
+        self.assertIn('do not soften or transform that action into giving', prompt)

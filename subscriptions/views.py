@@ -17,7 +17,7 @@ class PlanListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        plans = Plan.objects.filter(is_active=True)
+        plans = Plan.objects.filter(is_active=True).order_by('sort_order', 'price_monthly', 'id')
         return Response(PlanSerializer(plans, many=True).data)
 
 

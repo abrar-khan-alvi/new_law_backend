@@ -47,8 +47,7 @@ def _default_plans() -> list:
             'name': 'standard',
             'display_name': 'Plus',
             'description': ('All document types with editable DOCX export. 50 incident reports per '
-                            'month — search and arrest warrants are never capped, because a court '
-                            'deadline shouldn\'t wait on a subscription tier.'),
+                            'month. Search and arrest warrants are never capped.'),
             'price_monthly': 29, 'price_yearly': 290,
             'stripe_price_id_monthly': _bootstrap_price(existing, 'standard', 'stripe_price_id_monthly', 'STRIPE_PRICE_STANDARD_MONTHLY'),
             'stripe_price_id_yearly': _bootstrap_price(existing, 'standard', 'stripe_price_id_yearly', 'STRIPE_PRICE_STANDARD_YEARLY'),
@@ -67,8 +66,8 @@ def _default_plans() -> list:
         {
             'name': 'pro',
             'display_name': 'Pro',
-            'description': ('Everything unlimited — incident reports, search warrants, and arrest '
-                            'warrants — plus priority support, for high-volume users.'),
+            'description': ('Unlimited access for high-volume users. Unlimited incident reports, '
+                            'search warrants, and arrest warrants — plus priority support.'),
             'price_monthly': 59, 'price_yearly': 590,
             'stripe_price_id_monthly': _bootstrap_price(existing, 'pro', 'stripe_price_id_monthly', 'STRIPE_PRICE_PRO_MONTHLY'),
             'stripe_price_id_yearly': _bootstrap_price(existing, 'pro', 'stripe_price_id_yearly', 'STRIPE_PRICE_PRO_YEARLY'),

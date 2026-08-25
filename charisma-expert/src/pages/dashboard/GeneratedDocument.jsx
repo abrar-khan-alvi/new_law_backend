@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { FileText, RefreshCw, Download, AlertTriangle, Loader2, Database, Sparkles, Clock, CheckCircle, Cpu, FileCheck, ShieldAlert, ShieldCheck, PenLine, Gavel } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { FileText, RefreshCw, Download, AlertTriangle, Loader2, Database, Sparkles, Clock, CheckCircle, Cpu, FileCheck, ShieldAlert, ShieldCheck, PenLine, Gavel, Pencil } from 'lucide-react';
 import { getDocument, regenerateDocument, exportDocument, supervisorReview, prosecutorReview, signDocument } from '../../api/documents';
 import { useAuth } from '../../contexts/AuthContext';
 import AIGenerationLoader from '../../components/AIGenerationLoader';
@@ -76,6 +76,7 @@ const renderFormData = (data, level = 0) => {
 
 export default function GeneratedDocument() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [doc, setDoc] = useState(null);
   const [editedText, setEditedText] = useState('');
@@ -179,6 +180,20 @@ export default function GeneratedDocument() {
     } finally {
       setRegenerating(false);
     }
+  };
+
+  const handleEditSourceFacts = () => {
+    if (doc.doc_type !== 'incident_report') return;
+    navigate('/dashboard/create/incident-report', {
+      state: {
+        sourceDoc: {
+          id: doc.id,
+          case_number: doc.case_number,
+          form_data: doc.form_data,
+          narrative_style: doc.narrative_style,
+        },
+      },
+    });
   };
 
   const handleSupervisorReview = async (approved) => {
@@ -337,6 +352,16 @@ export default function GeneratedDocument() {
             <RefreshCw size={18} className={`mr-2.5 text-slate-400 group-hover:text-indigo-500 ${regenerating ? 'animate-spin' : ''}`} />
             {isFailed ? 'Try Again' : 'Regenerate'}
           </button>
+          {doc.doc_type === 'incident_report' && (
+            <button
+              onClick={handleEditSourceFacts}
+              disabled={isGenerating}
+              className="flex items-center px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-600 transition-all duration-200 shadow-sm hover:shadow disabled:opacity-50 group"
+            >
+              <Pencil size={18} className="mr-2.5 text-slate-400 group-hover:text-indigo-500" />
+              Edit Original Facts
+            </button>
+          )}
           <button
             onClick={() => handleExport('docx')}
             disabled={exportingDocx || isGenerating || isFailed || !reviewAcknowledged}

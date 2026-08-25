@@ -161,18 +161,36 @@ def build_incident_report_prompt(form_data, officer, narrative_style='first_pers
     facts = form_data.get('facts', {})
     incident = form_data.get('incident', {})
     parties = form_data.get('involved_parties', [])
+    notifications = form_data.get('notifications', {})
 
     categories = _defuse(', '.join(incident.get('categories', [])))
     party_lines = '\n'.join(
         f"- {_defuse(p.get('role', 'other'))}: {_defuse(p.get('full_name', ''))}"
+        + (f" (alias {_defuse(p['alias'])})" if p.get('alias') else '')
         + (f" (ID {_defuse(p['id_number'])})" if p.get('id_number') else '')
         for p in parties
+    ) or '- (none listed)'
+    notification_lines = '\n'.join(
+        f"- {label}: {_defuse(value)}"
+        for label, value in [
+            ('Weapon involved', notifications.get('weapon_detail') if notifications.get('weapon_involved') else ''),
+            ('Alcohol/drugs', notifications.get('alcohol_drugs_detail') if notifications.get('alcohol_drugs') else ''),
+            ('Hazing related', 'yes' if notifications.get('is_hazing') else ''),
+            ('Acts of terrorism', notifications.get('acts_of_terrorism_detail') or ('yes' if notifications.get('acts_of_terrorism') else '')),
+            ('Death involved', notifications.get('death_detail') or ('yes' if notifications.get('death_involved') else '')),
+            ('Outside agency notified', notifications.get('outside_agency') or ''),
+        ]
+        if value
     ) or '- (none listed)'
 
     header = (
         "You are assisting a law enforcement officer in drafting the NARRATIVE "
         "section of an incident report. Be objective, chronological, and "
-        "professional. Use 24-hour time.\n\n"
+        "professional. Use 24-hour time. Preserve the officer's actor-action-object "
+        "relationships exactly. If the facts say a person struck, hit, threw, cut, "
+        "threatened, stole, damaged, or used an item as an instrument, do not soften "
+        "or transform that action into giving, offering, possessing, or merely being "
+        "near the item.\n\n"
         f"{_OUTPUT_RULES}"
         f"{_style_instruction(narrative_style)}\n\n"
         "Officer on the report (context only — do NOT reproduce as a signature):\n"
@@ -183,6 +201,8 @@ def build_incident_report_prompt(form_data, officer, narrative_style='first_pers
         f"- Location: {_defuse(incident.get('location', ''))}\n"
         "Involved parties:\n"
         f"{party_lines}\n"
+        "Critical notifications:\n"
+        f"{notification_lines}\n"
     )
 
     query = ' '.join(filter(None, [facts.get('what', ''), facts.get('who', ''), categories]))
@@ -201,7 +221,11 @@ def build_incident_report_prompt(form_data, officer, narrative_style='first_pers
         "=== END FACTS ===\n"
     )
 
-    return header + style + facts_block + _ANTI_LEAK + "\nWrite the narrative now:"
+    return header + style + facts_block + _ANTI_LEAK + (
+        "\nBefore writing, silently verify that each sentence is grounded in the "
+        "FACTS block and that no weapon/object/action relationship has changed. "
+        "Write the narrative now:"
+    )
 
 
 # ── Search warrant ───────────────────────────────────────────────────
