@@ -16,8 +16,8 @@ export const cancelSubscription = () =>
   axiosInstance.post('/api/subscriptions/cancel/');
 
 /**
- * POST /api/subscriptions/start-trial/ — auth. One 7-day, no-card trial per
- * account, only available from the Free plan.
+ * POST /api/subscriptions/start-trial/ — auth. Legacy endpoint; new accounts
+ * automatically receive a 14-day Free Evaluation.
  * @param {string} plan - 'standard' | 'pro'
  */
 export const startTrial = (plan) =>

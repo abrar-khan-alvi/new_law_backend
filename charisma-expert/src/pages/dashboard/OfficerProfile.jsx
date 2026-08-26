@@ -40,7 +40,7 @@ export default function OfficerProfile() {
         
         // If there is no active subscription, we figure out the default plan from the plans list
         if (!subRes.data && plansRes.data && plansRes.data.length > 0) {
-          // Sort by price or sort_order to find the "Free Tier" or lowest tier
+          // Sort by price to find the Free Evaluation or lowest tier.
           const sorted = [...plansRes.data].sort((a, b) => parseFloat(a.price_monthly) - parseFloat(b.price_monthly));
           setDefaultPlan(sorted[0]);
         }
@@ -290,8 +290,14 @@ export default function OfficerProfile() {
           <div className="p-6">
             <div className="mb-6">
               <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-1">Current Tier</p>
-              <h3 className="text-2xl font-bold text-gray-900">{plan.display_name || plan.plan_display || 'Free Tier'}</h3>
-              <p className="text-sm text-gray-500 mt-1">Billed {subscription?.billing_cycle || 'monthly'}</p>
+              <h3 className="text-2xl font-bold text-gray-900">{plan.display_name || plan.plan_display || 'Free Evaluation'}</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {plan.name === 'free'
+                  ? subscription?.status === 'expired'
+                    ? 'Evaluation expired'
+                    : 'No credit card evaluation'
+                  : `Billed ${subscription?.billing_cycle || subscription?.billing_period || 'monthly'}`}
+              </p>
             </div>
 
             <div className="space-y-4 mb-8">
@@ -322,7 +328,7 @@ export default function OfficerProfile() {
               {plan.name === 'free' ? (
                 <div>
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600 font-medium">Lifetime Quota</span>
+                    <span className="text-gray-600 font-medium">Evaluation Quota</span>
                     <span className="text-gray-900 font-bold">
                       {(subscription?.documents_generated_this_month || 0) + (subscription?.warrants_generated_this_month || 0)} / {formatLimit(plan.document_limit)}
                     </span>

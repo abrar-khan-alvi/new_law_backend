@@ -6,9 +6,9 @@ from .models import Plan, Subscription
 
 @shared_task
 def reset_monthly_usage():
-    """Reset the monthly document counter for all active subscriptions."""
+    """Reset monthly counters for active paid subscriptions."""
     count = 0
-    for sub in Subscription.objects.filter(status='active'):
+    for sub in Subscription.objects.filter(status=Subscription.Status.ACTIVE):
         sub.reset_monthly_usage()
         count += 1
     return f'Reset usage for {count} subscriptions.'
@@ -16,29 +16,20 @@ def reset_monthly_usage():
 
 @shared_task
 def expire_trials():
-    """Revert any trial whose trial_end has passed back to the free plan."""
+    """Mark expired Free Evaluations as expired instead of reactivating Free."""
     free_plan = Plan.objects.filter(name='free').first()
     if not free_plan:
-        return 'No free plan configured — skipped.'
+        return 'No free plan configured - skipped.'
 
-    expired = Subscription.objects.filter(status='trialing', trial_end__lt=timezone.now())
+    expired = Subscription.objects.filter(
+        status=Subscription.Status.TRIALING,
+        plan=free_plan,
+        trial_end__lt=timezone.now(),
+    )
     count = 0
     for sub in expired:
-        sub.plan = free_plan
-        sub.status = 'active'
-        sub.trial_end = None
-        # Reset usage — otherwise someone who generated well past Free's small
-        # quota during a Pro trial would land back on Free already over-limit
-        # and be locked out until next month's reset, through no fault of theirs.
-        sub.documents_generated_this_month = 0
-        sub.warrants_generated_this_month = 0
-        sub.search_warrants_generated_this_month = 0
-        sub.arrest_warrants_generated_this_month = 0
+        sub.status = Subscription.Status.EXPIRED
         sub.usage_reset_date = timezone.now().date()
-        sub.save(update_fields=[
-            'plan', 'status', 'trial_end', 'documents_generated_this_month',
-            'warrants_generated_this_month', 'search_warrants_generated_this_month',
-            'arrest_warrants_generated_this_month', 'usage_reset_date',
-        ])
+        sub.save(update_fields=['status', 'usage_reset_date'])
         count += 1
-    return f'Expired {count} trial(s).'
+    return f'Expired {count} free evaluation(s).'

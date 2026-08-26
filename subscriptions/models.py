@@ -21,8 +21,8 @@ class Plan(models.Model):
     # ── Features / limits ───────────────────────────────────────────────
     # Incident reports per month. NULL means unlimited (not a magic-number sentinel).
     document_limit = models.PositiveIntegerField(
-        null=True, blank=True, default=7,
-        help_text='Incident reports per month (the Free plan uses this as a combined lifetime limit). Leave blank for unlimited.',
+        null=True, blank=True, default=10,
+        help_text='Incident reports per month (the Free Evaluation plan uses this as a combined trial limit). Leave blank for unlimited.',
     )
     # Search + arrest warrants per month, combined. NULL means unlimited — the
     # policy is that warrant generation is never hard-capped on a paying plan,
@@ -134,7 +134,7 @@ class Subscription(models.Model):
     def reset_monthly_usage(self):
         """Called by the Celery beat task on the 1st of each month (Phase 5)."""
         if self.plan.name == 'free':
-            # The free plan has a lifetime quota, so we do not reset it.
+            # The free evaluation has a one-time quota, so we do not reset it.
             return
             
         self.documents_generated_this_month = 0
@@ -164,12 +164,18 @@ class Subscription(models.Model):
         raise ValueError(f'Unrecognized doc_type for quota accounting: {doc_type!r}')
 
     def has_access_entitlement(self) -> bool:
-        """Free plans are local; paid plans require a live Stripe subscription."""
-        if self.status != self.Status.ACTIVE:
-            return False
+        """
+        Free Evaluation access is temporary and local; paid access requires a
+        live Stripe subscription. Keeping those paths explicit prevents an
+        expired evaluation from behaving like a permanent free tier.
+        """
         if self.plan.name == 'free':
-            return True
-        return bool(self.stripe_subscription_id)
+            return (
+                self.status == self.Status.TRIALING
+                and self.trial_end is not None
+                and self.trial_end >= timezone.now()
+            )
+        return self.status == self.Status.ACTIVE and bool(self.stripe_subscription_id)
 
     def try_reserve_quota(self, doc_type: str) -> bool:
         """
@@ -186,7 +192,7 @@ class Subscription(models.Model):
         qs = Subscription.objects.filter(pk=self.pk)
         
         if self.plan.name == 'free':
-            # For the free plan, the document_limit acts as a global combined limit.
+            # For the free evaluation, document_limit acts as one combined cap.
             qs = qs.alias(total_usage=models.F('documents_generated_this_month') + models.F('warrants_generated_this_month')).filter(total_usage__lt=self.plan.document_limit)
         elif limit is not None:
             qs = qs.filter(**{f'{counter_field}__lt': limit})

@@ -140,10 +140,10 @@ def _on_subscription_cancelled(stripe_sub):
     try:
         sub = Subscription.objects.get(stripe_subscription_id=stripe_sub['id'])
         sub.plan = Plan.objects.get(name='free')
-        # The paid Stripe subscription is cancelled, but the local account is
-        # immediately active on Free; a cancelled local status would block all
-        # generation even though the Free plan was assigned.
-        sub.status = 'active'
+        # The paid Stripe subscription is cancelled. Assign the Free Evaluation
+        # plan for display, but mark access expired so cancellation does not
+        # become a permanent free tier.
+        sub.status = Subscription.Status.EXPIRED
         sub.cancel_at_period_end = False
         # Clear it — otherwise a future resubscribe attempt would try to
         # modify this now-dead Stripe subscription instead of starting a new one.

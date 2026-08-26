@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 from django.conf import settings
 from django.utils import timezone
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -8,8 +6,6 @@ from rest_framework.views import APIView
 
 from .models import Plan
 from .serializers import PlanSerializer, SubscriptionSerializer
-
-TRIAL_DAYS = 7
 
 
 class PlanListView(APIView):
@@ -35,11 +31,8 @@ class SubscriptionStatusView(APIView):
 class StartTrialView(APIView):
     """
     POST /api/subscriptions/start-trial/
-    Body: {"plan": "standard"|"pro"}
-    A single no-card-required trial per account, available only from the free
-    plan. Reverts to free automatically after TRIAL_DAYS (see
-    subscriptions.tasks.expire_trials, run daily by Celery beat) unless the
-    user checks out for real before then.
+    Legacy endpoint retained for API compatibility. New accounts automatically
+    receive a 14-day Free Evaluation; extra self-started trials are disabled.
     """
     permission_classes = [IsAuthenticated]
 
@@ -49,35 +42,6 @@ class StartTrialView(APIView):
                        'code': 'trials_disabled'}},
             status=403,
         )
-
-        sub = getattr(request.user, 'subscription', None)
-        if not sub:
-            return Response({'error': {'detail': 'No subscription found.'}}, status=404)
-        if sub.has_used_trial:
-            return Response(
-                {'error': {'detail': 'You have already used your free trial.', 'code': 'trial_used'}},
-                status=400,
-            )
-        if sub.plan.name != 'free':
-            return Response(
-                {'error': {'detail': 'A trial is only available from the Free plan.', 'code': 'not_on_free'}},
-                status=400,
-            )
-
-        plan_name = request.data.get('plan')
-        plan = Plan.objects.filter(name=plan_name, is_active=True).exclude(name='free').first()
-        if not plan:
-            return Response({'error': {'detail': 'Unknown plan.'}}, status=400)
-
-        sub.plan = plan
-        sub.status = 'trialing'
-        sub.trial_end = timezone.now() + timedelta(days=TRIAL_DAYS)
-        sub.has_used_trial = True
-        sub.documents_generated_this_month = 0
-        sub.save(update_fields=[
-            'plan', 'status', 'trial_end', 'has_used_trial', 'documents_generated_this_month',
-        ])
-        return Response(SubscriptionSerializer(sub).data, status=201)
 
 
 class CancelSubscriptionView(APIView):
@@ -109,19 +73,18 @@ class CancelSubscriptionView(APIView):
                 return Response(
                     {'error': {'detail': 'No free plan configured.', 'code': 'no_free_plan'}}, status=500)
             sub.plan = free_plan
-            sub.status = 'active'
-            sub.trial_end = None
+            sub.status = 'expired'
             sub.documents_generated_this_month = 0
             sub.warrants_generated_this_month = 0
             sub.search_warrants_generated_this_month = 0
             sub.arrest_warrants_generated_this_month = 0
             sub.usage_reset_date = timezone.now().date()
             sub.save(update_fields=[
-                'plan', 'status', 'trial_end', 'documents_generated_this_month',
+                'plan', 'status', 'documents_generated_this_month',
                 'warrants_generated_this_month', 'search_warrants_generated_this_month',
                 'arrest_warrants_generated_this_month', 'usage_reset_date',
             ])
-            return Response({'message': 'Your trial has ended and your account has reverted to Free.'})
+            return Response({'message': 'Your free evaluation has ended. Choose a paid plan to continue.'})
 
         if not settings.PAYMENTS_ENABLED:
             return Response(

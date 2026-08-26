@@ -1,7 +1,7 @@
 """
 Regression tests for the core auth lifecycle (previously zero coverage in
 this app):
-- registration creates an unverified officer + free subscription.
+- registration creates an unverified officer + free evaluation.
 - login is refused until email is verified.
 - email verification via OTP flips the account to verified.
 - change-password / password-reset-confirm blacklist prior refresh tokens
@@ -10,11 +10,12 @@ this app):
 """
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounts.models import EmailOTP
 from accounts.otp import generate_otp
-from subscriptions.models import Plan
+from subscriptions.models import Plan, Subscription
 
 User = get_user_model()
 
@@ -24,9 +25,9 @@ class RegistrationTests(TestCase):
         # accounts.signals.create_free_subscription picks the lowest-priced
         # active plan — without one, it warns and skips, same as every other
         # test file in this repo that exercises user creation.
-        Plan.objects.create(name='free', display_name='Free', price_monthly=0)
+        Plan.objects.create(name='free', display_name='Free Evaluation', price_monthly=0)
 
-    def test_register_creates_unverified_officer_with_free_subscription(self):
+    def test_register_creates_unverified_officer_with_free_evaluation(self):
         client = APIClient()
         resp = client.post('/api/auth/register/', {
             'email': 'newofficer@example.com', 'password': 'S3cure-Pass!23',
@@ -39,6 +40,9 @@ class RegistrationTests(TestCase):
         self.assertFalse(user.email_verified)
         self.assertTrue(hasattr(user, 'subscription'))
         self.assertEqual(user.subscription.plan.name, 'free')
+        self.assertEqual(user.subscription.status, Subscription.Status.TRIALING)
+        self.assertTrue(user.subscription.has_used_trial)
+        self.assertGreater(user.subscription.trial_end, timezone.now())
 
     def test_password_mismatch_is_rejected(self):
         client = APIClient()

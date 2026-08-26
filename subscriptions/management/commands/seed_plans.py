@@ -1,8 +1,10 @@
 import os
+from datetime import timedelta
 
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
-from subscriptions.models import Plan
+from subscriptions.models import Plan, Subscription
 
 # document_limit=None means unlimited (a real nullable field, not a sentinel).
 #
@@ -26,13 +28,13 @@ def _default_plans() -> list:
     return [
         {
             'name': 'free',
-            'display_name': 'Free',
-            'description': ('Seven AI document generations for the lifetime of the account, combined '
-                            'across incident reports, search warrants, and arrest warrants. PDF and '
-                            'DOCX test exports included.'),
+            'display_name': 'Free Evaluation',
+            'description': ('Evaluate KLYVOREK for 14 days with 10 total document generations. '
+                            'No credit card required. Incident reports, search warrants, arrest '
+                            'warrants, PDF export, and editable DOCX export are included.'),
             'price_monthly': 0, 'price_yearly': 0,
-            'document_limit': 7,
-            'warrant_document_limit': 7,
+            'document_limit': 10,
+            'warrant_document_limit': 10,
             'can_incident_report': True,
             'can_search_warrant': True,
             'can_arrest_warrant': True,
@@ -46,13 +48,13 @@ def _default_plans() -> list:
         {
             'name': 'standard',
             'display_name': 'Plus',
-            'description': ('All document types with editable DOCX export. 50 incident reports per '
-                            'month. Search and arrest warrants are never capped.'),
+            'description': ('For individual officers. 50 incident reports per month, 10 search or '
+                            'arrest warrant drafts per month, and editable DOCX export.'),
             'price_monthly': 29, 'price_yearly': 290,
             'stripe_price_id_monthly': _bootstrap_price(existing, 'standard', 'stripe_price_id_monthly', 'STRIPE_PRICE_STANDARD_MONTHLY'),
             'stripe_price_id_yearly': _bootstrap_price(existing, 'standard', 'stripe_price_id_yearly', 'STRIPE_PRICE_STANDARD_YEARLY'),
             'document_limit': 50,
-            'warrant_document_limit': None,
+            'warrant_document_limit': 10,
             'can_incident_report': True,
             'can_search_warrant': True,
             'can_arrest_warrant': True,
@@ -102,6 +104,20 @@ class Command(BaseCommand):
         # rather than delete so existing subscriptions referencing them stay intact.
         retired = Plan.objects.exclude(name__in=names).filter(is_active=True)
         retired_count = retired.update(is_active=False)
+        free_plan = Plan.objects.filter(name='free').first()
+        transitioned_count = 0
+        if free_plan:
+            transitioned_count = Subscription.objects.filter(
+                plan=free_plan,
+                status=Subscription.Status.ACTIVE,
+                stripe_subscription_id='',
+                trial_end__isnull=True,
+            ).update(
+                status=Subscription.Status.TRIALING,
+                trial_end=timezone.now() + timedelta(days=14),
+                has_used_trial=True,
+                usage_reset_date=timezone.now().date(),
+            )
 
         self.stdout.write(self.style.SUCCESS(
             f'Plans seeded — {created} created, {updated} updated, {retired_count} retired.'

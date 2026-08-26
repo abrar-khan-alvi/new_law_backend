@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { listDocuments } from '../../api/documents';
 import { getSubscriptionStatus } from '../../api/subscriptions';
@@ -24,6 +24,7 @@ const DOC_TYPE_LABELS = {
 
 export default function OfficerDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [recentDocs, setRecentDocs] = useState([]);
   const [subscription, setSubscription] = useState(null);
@@ -59,7 +60,8 @@ export default function OfficerDashboard() {
   };
 
   // Subscription info
-  const planName = subscription?.plan?.display_name || user?.subscription?.plan_display || 'Free';
+  const planName = subscription?.plan?.display_name || user?.subscription?.plan_display || 'Free Evaluation';
+  const isEvaluationPlan = subscription?.plan?.name === 'free';
   const docsUsed = subscription?.documents_generated_this_month ?? user?.subscription?.documents_generated_this_month ?? 0;
   // document_limit is a nullable field where null means "unlimited" (see
   // subscriptions/models.py) — must not fall through `??` to a default when
@@ -107,7 +109,7 @@ export default function OfficerDashboard() {
                 <span className="text-sm text-gray-500 font-medium">
                   Current Plan: <span className="text-gray-900 font-bold">{planName}</span>
                 </span>
-                {planName === 'Free' && (
+                {isEvaluationPlan && (
                   <button 
                     onClick={() => navigate('/dashboard/billing')}
                     className="text-sm bg-blue-600 text-white font-medium px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
@@ -117,7 +119,7 @@ export default function OfficerDashboard() {
                 )}
               </div>
               
-              {planName === 'Free' ? (
+              {isEvaluationPlan ? (
                 <>
                   <div className="flex justify-between items-center text-xs text-gray-500 mb-2 font-medium">
                     <span>
@@ -128,7 +130,7 @@ export default function OfficerDashboard() {
                       {`${searchWarrantsUsed} Search`}
                       {' · '}
                       {`${arrestWarrantsUsed} Arrest`}
-                      {' — Lifetime Limit'}
+                      {' - Evaluation Limit'}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
