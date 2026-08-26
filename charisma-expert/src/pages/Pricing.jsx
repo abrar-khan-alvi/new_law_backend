@@ -87,7 +87,7 @@ export default function Pricing() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8 xl:gap-10 items-stretch">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 xl:gap-12 items-stretch">
                 {plans.map((plan, idx) => {
                   const isPopular = idx === 1 || plan.name === 'standard'
                   const isFree = plan.name === 'free'
@@ -192,32 +192,6 @@ export default function Pricing() {
                     </div>
                   )
                 })}
-
-                <div className="relative rounded-3xl border-2 border-gray-200 p-10 xl:p-12 flex flex-col bg-white min-h-[600px] shadow-sm">
-                  <div className="mb-8">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Department</h2>
-                    <p className="text-sm text-gray-500 leading-relaxed">
-                      Department pricing for agencies, multi-user teams, supervisors, and procurement review.
-                    </p>
-                  </div>
-                  <div className="mb-10">
-                    <span className="text-4xl font-extrabold text-gray-900 tracking-tight">Contact Us</span>
-                  </div>
-                  <ul className="space-y-4 mb-10 flex-1">
-                    {['Multi-user agency access', 'Department usage review', 'Supervisor and agency workflows', 'Procurement-friendly onboarding'].map((item) => (
-                      <li key={item} className="flex items-center gap-3">
-                        <Check size={20} className="text-emerald-500 shrink-0" />
-                        <span className="text-sm text-gray-700 font-medium">{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Link
-                    to="/contact"
-                    className="w-full py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center border-2 border-gray-200 text-gray-700 hover:border-navy-800 hover:text-navy-800"
-                  >
-                    Contact Us
-                  </Link>
-                </div>
               </div>
             </>
           )}
