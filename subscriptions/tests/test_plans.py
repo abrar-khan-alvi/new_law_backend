@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -103,6 +103,7 @@ class QuotaAtomicityTests(TestCase):
         self.assertEqual(self.sub.documents_generated_this_month, 4)
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class TrialLifecycleTests(TestCase):
     def setUp(self):
         self.user = User.objects.create(email='trial@example.com')

@@ -9,7 +9,7 @@ this app):
   reset, must stop working after the reset).
 """
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -20,6 +20,7 @@ from subscriptions.models import Plan, Subscription
 User = get_user_model()
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class RegistrationTests(TestCase):
     def setUp(self):
         # accounts.signals.create_free_subscription picks the lowest-priced
@@ -54,6 +55,7 @@ class RegistrationTests(TestCase):
         self.assertFalse(User.objects.filter(email='mismatch@example.com').exists())
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class LoginVerificationGateTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -80,6 +82,7 @@ class LoginVerificationGateTests(TestCase):
         self.assertIn('refresh', resp.data)
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class EmailVerificationTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -104,6 +107,7 @@ class EmailVerificationTests(TestCase):
         self.assertFalse(self.user.email_verified)
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class TokenRevocationTests(TestCase):
     """Phase 2: password change/reset must blacklist outstanding refresh tokens."""
 
