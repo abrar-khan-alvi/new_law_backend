@@ -53,8 +53,11 @@ export default function About() {
               <p className="text-gray-600 mb-4 leading-relaxed">
                 We believe that law enforcement officers should spend their time protecting communities, not battling administrative paperwork.
               </p>
+              <p className="text-gray-600 mb-4 leading-relaxed">
+                KLYVOREK is designed to help officers work more efficiently while producing clearer, higher-quality legal documentation for review.
+              </p>
               <p className="text-gray-600 leading-relaxed">
-                By providing specialized, isolated AI models trained on legal and operational frameworks, we empower agencies to generate accurate, court-ready documentation in a fraction of the time it takes with traditional methods, without ever compromising data security.
+                By providing specialized AI-assisted workflows built around legal and operational documentation, KLYVOREK helps agencies prepare clearer drafts in less time while preserving officer review, agency policy, and data-security responsibilities.
               </p>
             </div>
 
@@ -80,8 +83,8 @@ export default function About() {
           <div className="space-y-5 text-gray-600 leading-relaxed bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
             <p>KLYVOREK began with a simple observation. While serving as a police sergeant with a metro Atlanta (Georgia) law enforcement agency, Sergeant Edward Brown regularly reviewed reports written by officers and dispatchers. Important details were sometimes missing, grammar was inconsistent, and narratives did not always reflect the professionalism of the people doing the work.</p>
             <p>A police report is more than paperwork. It is a permanent legal document that may later be reviewed by prosecutors, attorneys, judges, juries, and the public. What is omitted or poorly explained can create unnecessary questions and potential liability.</p>
-            <p>General-purpose AI tools, like ChatGPT, Google Gemini, and Claude, raised another concern: sensitive law enforcement information should not be entered into platforms that an agency has not approved for handling that information, nor are those platforms secure. Existing report-writing systems could also be complicated, expensive, or too broad for everyday law enforcement documentation.</p>
-            <p>Brown partnered with an experienced AI and web-development team to create KLYVOREK around three principles: <strong>Secure by Design. Simple to Use. Affordable to Deploy.</strong></p>
+            <p>General-purpose AI tools, like ChatGPT, Google Gemini, and Claude, raised another concern: sensitive law enforcement information should be entered only into AI platforms that have been evaluated and approved for an agency's specific security, privacy, and compliance requirements. Existing report-writing systems could also be complicated, expensive, or too broad for everyday law enforcement documentation.</p>
+            <p>Brown partnered with an experienced AI and web-development team with practical experience building secure, production-grade software systems to create KLYVOREK around three principles: <strong>Secure by Design. Simple to Use. Affordable to Deploy.</strong></p>
             <p>KLYVOREK helps law enforcement personnel turn officer-provided facts into clear incident reports, organized investigative documentation, and structured drafts of arrest and search warrant applications, while keeping the officer in control.</p>
             <p className="font-semibold text-gray-900">KLYVOREK was created because law enforcement needed technology that better understood the documentation work they do.</p>
           </div>
