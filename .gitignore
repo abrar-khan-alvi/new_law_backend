@@ -15,9 +15,7 @@ media/
 staticfiles/
 
 # Environment
-.env
 secrets/
-.env.*
 !.env.example
 !.env.aws.example
 !charisma-expert/.env.production.example
@@ -51,3 +49,5 @@ temp_interactive_push.bat
 .gitignore
 docs
 
+config.bat
+node_modules
