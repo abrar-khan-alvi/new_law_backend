@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { UploadCloud, FileText, Database, ChevronDown, CheckCircle2, Loader2, AlertCircle, Trash2 } from 'lucide-react';
+import { useMemo } from 'react';
+import { UploadCloud, FileText, Database, ChevronDown, CheckCircle2, Loader2, AlertCircle, Trash2, Search } from 'lucide-react';
 import { deleteTrainingDoc, listTrainingDocs, uploadTrainingDoc } from '../../api/aiEngine';
 
 export default function DatasetManagement() {
@@ -11,6 +12,7 @@ export default function DatasetManagement() {
   const [uploadError, setUploadError] = useState('');
   const [uploadSuccess, setUploadSuccess] = useState('');
   const [deletingId, setDeletingId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchFiles = async () => {
     try {
@@ -81,6 +83,27 @@ export default function DatasetManagement() {
   const searchWarrantsCount = files.filter(f => f.doc_type === 'search_warrant').length;
   const arrestWarrantsCount = files.filter(f => f.doc_type === 'arrest_warrant').length;
   const totalCount = files.length;
+  const indexedCount = files.filter(f => f.is_indexed).length;
+  const processingCount = Math.max(totalCount - indexedCount, 0);
+
+  const visibleFiles = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return files;
+
+    return files.filter((file) => {
+      const searchable = [
+        file.title,
+        file.original_filename,
+        file.uploaded_by_email,
+        file.doc_type?.replace('_', ' '),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return searchable.includes(term);
+    });
+  }, [files, searchTerm]);
 
   const incidentPercentage = totalCount > 0 ? (incidentReportsCount / totalCount) * 100 : 0;
   const searchPercentage = totalCount > 0 ? (searchWarrantsCount / totalCount) * 100 : 0;
@@ -150,13 +173,44 @@ export default function DatasetManagement() {
 
           {/* Recent Training Files */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Recent Training Files</h2>
+            <div className="p-6 border-b border-gray-200 space-y-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Recent Training Files</h2>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {totalCount} total documents, {indexedCount} indexed, {processingCount} processing.
+                  </p>
+                </div>
+                <div className="relative w-full xl:max-w-xs">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="search"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search files"
+                    className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Files</p>
+                  <p className="mt-1 text-2xl font-bold text-gray-900">{totalCount}</p>
+                </div>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Indexed</p>
+                  <p className="mt-1 text-2xl font-bold text-emerald-800">{indexedCount}</p>
+                </div>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Processing</p>
+                  <p className="mt-1 text-2xl font-bold text-amber-800">{processingCount}</p>
+                </div>
+              </div>
             </div>
             
-            <div className="overflow-x-auto">
+            <div className="hidden max-h-[560px] overflow-auto md:block">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50/50">
+                <thead className="sticky top-0 z-10 bg-gray-50">
                   <tr>
                     <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">File</th>
                     <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Repository</th>
@@ -166,20 +220,20 @@ export default function DatasetManagement() {
                 <tbody className="bg-white divide-y divide-gray-100">
                   {loading && files.length === 0 ? (
                     <tr><td colSpan="3" className="px-6 py-8 text-center"><Loader2 className="animate-spin text-gray-400 mx-auto" /></td></tr>
-                  ) : files.length === 0 ? (
+                  ) : visibleFiles.length === 0 ? (
                     <tr><td colSpan="3" className="px-6 py-8 text-center text-gray-500">No training documents uploaded yet.</td></tr>
                   ) : (
-                    files.map((file) => (
+                    visibleFiles.map((file) => (
                       <tr key={file.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-5 whitespace-nowrap">
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center min-w-0">
-                            <FileText className="h-6 w-6 text-gray-400 mr-4 flex-shrink-0" />
-                            <div>
-                              <div className="text-sm font-semibold text-gray-900 truncate max-w-[200px]" title={file.title}>{file.title}</div>
-                              <div className="text-xs text-gray-500 mt-0.5">{new Date(file.created_at).toLocaleString()}</div>
-                              <div className="text-xs text-gray-400 mt-0.5">By: {file.uploaded_by_email}</div>
-                            </div>
+                              <FileText className="h-6 w-6 text-gray-400 mr-4 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <div className="max-w-[240px] truncate text-sm font-semibold text-gray-900" title={file.title}>{file.title}</div>
+                                <div className="text-xs text-gray-500 mt-0.5">{new Date(file.created_at).toLocaleString()}</div>
+                                <div className="text-xs text-gray-400 mt-0.5">By: {file.uploaded_by_email}</div>
+                              </div>
                             </div>
                             <button
                               type="button"
@@ -216,6 +270,57 @@ export default function DatasetManagement() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            <div className="max-h-[560px] space-y-3 overflow-y-auto p-4 md:hidden">
+              {loading && files.length === 0 ? (
+                <div className="flex justify-center py-8"><Loader2 className="animate-spin text-gray-400" /></div>
+              ) : visibleFiles.length === 0 ? (
+                <div className="py-8 text-center text-sm text-gray-500">No training documents uploaded yet.</div>
+              ) : (
+                visibleFiles.map((file) => (
+                  <div key={file.id} className="rounded-lg border border-gray-200 bg-white p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start">
+                        <FileText className="mr-3 mt-0.5 h-5 w-5 flex-shrink-0 text-gray-400" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-gray-900" title={file.title}>{file.title}</p>
+                          <p className="mt-1 text-xs text-gray-500">{new Date(file.created_at).toLocaleString()}</p>
+                          <p className="mt-0.5 truncate text-xs text-gray-400">By: {file.uploaded_by_email}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(file)}
+                        disabled={deletingId === file.id}
+                        className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-60"
+                        title="Delete training document"
+                        aria-label={`Delete ${file.title || file.original_filename}`}
+                      >
+                        {deletingId === file.id ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={16} />
+                        )}
+                      </button>
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium capitalize text-gray-700">
+                        {file.doc_type.replace('_', ' ')}
+                      </span>
+                      {file.is_indexed ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                          <CheckCircle2 size={12} /> Indexed ({file.chunk_count} chunks)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
+                          <Loader2 size={12} className="animate-spin" /> Processing
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
