@@ -161,25 +161,40 @@ export default function DatasetManagement() {
                     <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">File</th>
                     <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Repository</th>
                     <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                    <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
                   {loading && files.length === 0 ? (
-                    <tr><td colSpan="4" className="px-6 py-8 text-center"><Loader2 className="animate-spin text-gray-400 mx-auto" /></td></tr>
+                    <tr><td colSpan="3" className="px-6 py-8 text-center"><Loader2 className="animate-spin text-gray-400 mx-auto" /></td></tr>
                   ) : files.length === 0 ? (
-                    <tr><td colSpan="4" className="px-6 py-8 text-center text-gray-500">No training documents uploaded yet.</td></tr>
+                    <tr><td colSpan="3" className="px-6 py-8 text-center text-gray-500">No training documents uploaded yet.</td></tr>
                   ) : (
                     files.map((file) => (
                       <tr key={file.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-5 whitespace-nowrap">
-                          <div className="flex items-center">
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center min-w-0">
                             <FileText className="h-6 w-6 text-gray-400 mr-4 flex-shrink-0" />
                             <div>
                               <div className="text-sm font-semibold text-gray-900 truncate max-w-[200px]" title={file.title}>{file.title}</div>
                               <div className="text-xs text-gray-500 mt-0.5">{new Date(file.created_at).toLocaleString()}</div>
                               <div className="text-xs text-gray-400 mt-0.5">By: {file.uploaded_by_email}</div>
                             </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(file)}
+                              disabled={deletingId === file.id}
+                              className="inline-flex items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+                              title="Delete training document"
+                              aria-label={`Delete ${file.title || file.original_filename}`}
+                            >
+                              {deletingId === file.id ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <Trash2 size={16} />
+                              )}
+                            </button>
                           </div>
                         </td>
                         <td className="px-6 py-5 whitespace-nowrap text-sm text-gray-600 capitalize">
@@ -195,22 +210,6 @@ export default function DatasetManagement() {
                               <Loader2 size={12} className="animate-spin" /> Processing
                             </span>
                           )}
-                        </td>
-                        <td className="px-6 py-5 whitespace-nowrap text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(file)}
-                            disabled={deletingId === file.id}
-                            className="inline-flex items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
-                            title="Delete training document"
-                            aria-label={`Delete ${file.title || file.original_filename}`}
-                          >
-                            {deletingId === file.id ? (
-                              <Loader2 size={16} className="animate-spin" />
-                            ) : (
-                              <Trash2 size={16} />
-                            )}
-                          </button>
                         </td>
                       </tr>
                     ))
