@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { UploadCloud, FileText, Database, ChevronDown, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
-import { listTrainingDocs, uploadTrainingDoc } from '../../api/aiEngine';
+import { UploadCloud, FileText, Database, ChevronDown, CheckCircle2, Loader2, AlertCircle, Trash2 } from 'lucide-react';
+import { deleteTrainingDoc, listTrainingDocs, uploadTrainingDoc } from '../../api/aiEngine';
 
 export default function DatasetManagement() {
   const [files, setFiles] = useState([]);
@@ -10,6 +10,7 @@ export default function DatasetManagement() {
   const [targetRepo, setTargetRepo] = useState('incident_report');
   const [uploadError, setUploadError] = useState('');
   const [uploadSuccess, setUploadSuccess] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
 
   const fetchFiles = async () => {
     try {
@@ -51,6 +52,28 @@ export default function DatasetManagement() {
       setUploading(false);
       // Reset input
       e.target.value = null;
+    }
+  };
+
+  const handleDelete = async (file) => {
+    const confirmed = window.confirm(
+      `Delete "${file.title || file.original_filename}" from AI training data? This removes the stored upload and indexed chunks.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(file.id);
+    setUploadError('');
+    setUploadSuccess('');
+    try {
+      await deleteTrainingDoc(file.id);
+      setFiles((current) => current.filter((item) => item.id !== file.id));
+      setUploadSuccess(`Deleted ${file.title || file.original_filename}`);
+    } catch (err) {
+      const apiError = err?.response?.data?.error;
+      const message = typeof apiError === 'string' ? apiError : apiError?.detail;
+      setUploadError(message || 'Failed to delete document. Please try again.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -138,13 +161,14 @@ export default function DatasetManagement() {
                     <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">File</th>
                     <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Repository</th>
                     <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
                   {loading && files.length === 0 ? (
-                    <tr><td colSpan="3" className="px-6 py-8 text-center"><Loader2 className="animate-spin text-gray-400 mx-auto" /></td></tr>
+                    <tr><td colSpan="4" className="px-6 py-8 text-center"><Loader2 className="animate-spin text-gray-400 mx-auto" /></td></tr>
                   ) : files.length === 0 ? (
-                    <tr><td colSpan="3" className="px-6 py-8 text-center text-gray-500">No training documents uploaded yet.</td></tr>
+                    <tr><td colSpan="4" className="px-6 py-8 text-center text-gray-500">No training documents uploaded yet.</td></tr>
                   ) : (
                     files.map((file) => (
                       <tr key={file.id} className="hover:bg-gray-50 transition-colors">
@@ -171,6 +195,22 @@ export default function DatasetManagement() {
                               <Loader2 size={12} className="animate-spin" /> Processing
                             </span>
                           )}
+                        </td>
+                        <td className="px-6 py-5 whitespace-nowrap text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(file)}
+                            disabled={deletingId === file.id}
+                            className="inline-flex items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+                            title="Delete training document"
+                            aria-label={`Delete ${file.title || file.original_filename}`}
+                          >
+                            {deletingId === file.id ? (
+                              <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={16} />
+                            )}
+                          </button>
                         </td>
                       </tr>
                     ))

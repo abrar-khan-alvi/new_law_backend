@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -5,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.permissions import IsAdmin
-from utils.storage import store_upload
+from utils.storage import delete_upload, store_upload
 
 from .document_parser import extract_text
 from .models import TrainingDocument
@@ -13,6 +14,7 @@ from .serializers import TrainingDocumentSerializer
 from .tasks import index_training_document
 
 VALID_DOC_TYPES = {'incident_report', 'search_warrant', 'arrest_warrant'}
+logger = logging.getLogger(__name__)
 
 
 class TrainingDocumentListView(APIView):
@@ -25,6 +27,26 @@ class TrainingDocumentListView(APIView):
         if doc_type:
             qs = qs.filter(doc_type=doc_type)
         return Response(TrainingDocumentSerializer(qs, many=True).data)
+
+
+class TrainingDocumentDetailView(APIView):
+    """DELETE /api/ai/training-docs/<pk>/ - admin-only training document delete."""
+    permission_classes = [IsAdmin]
+
+    def delete(self, request, pk):
+        try:
+            training_doc = TrainingDocument.objects.get(pk=pk)
+        except TrainingDocument.DoesNotExist:
+            return Response({'error': {'detail': 'Training document not found.'}}, status=404)
+
+        storage_key = training_doc.s3_key
+        training_doc.delete()
+        try:
+            deleted_file = delete_upload(storage_key)
+        except Exception:  # noqa: BLE001
+            logger.exception('Failed to delete stored training document file: %s', storage_key)
+            deleted_file = False
+        return Response({'deleted': True, 'stored_file_deleted': deleted_file})
 
 
 class UploadTrainingDocumentView(APIView):

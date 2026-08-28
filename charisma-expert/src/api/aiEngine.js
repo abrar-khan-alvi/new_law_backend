@@ -16,3 +16,9 @@ export const uploadTrainingDoc = (formData) =>
   axiosInstance.post('/api/ai/training-docs/upload/', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+
+/**
+ * DELETE /api/ai/training-docs/:id/
+ */
+export const deleteTrainingDoc = (id) =>
+  axiosInstance.delete(`/api/ai/training-docs/${id}/`);
